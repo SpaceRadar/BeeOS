@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+
+<project>
+  <fileVersion>2</fileVersion>
+  <fileChecksum>3464525263</fileChecksum>
+  <configuration>
+    <name>Debug</name>
+    <outputs>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Project\STM32F4xx_StdPeriph_Templates\stm32f4xx_conf.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\stm32f4xx_it.__cstat.et</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_i2c.h</file>
+      <file>$TOOLKIT_DIR$\inc\c\DLib_Threads.h</file>
+      <file>$PROJ_DIR$\stm32f4xx_conf.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\BeeOS.__cstat.et</file>
+      <file>$PROJ_DIR$\Debug\Obj\BeeOS.pbi</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_flash.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_exti.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\stm32f4xx_gpio.__cstat.et</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Project\STM32F4xx_StdPeriph_Templates\main.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_sdio.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\stm32f4xx_gpio.o</file>
+      <file>$TOOLKIT_DIR$\inc\c\intrinsics.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_dbgmcu.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_rcc.h</file>
+      <file>$TOOLKIT_DIR$\inc\c\ycheck.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\system_stm32f4xx.__cstat.et</file>
+      <file>$PROJ_DIR$\Debug\Exe\c.out</file>
+      <file>$PROJ_DIR$\Debug\Obj\main.pbi</file>
+      <file>$PROJ_DIR$\Debug\Obj\main.__cstat.et</file>
+      <file>$PROJ_DIR$\Debug\Obj\main.o</file>
+      <file>$PROJ_DIR$\Debug\Obj\stm32f4xx_rcc.__cstat.et</file>
+      <file>$PROJ_DIR$\Debug\Obj\stm32f4xx_gpio.pbi</file>
+      <file>$TOOLKIT_DIR$\inc\c\DLib_Defaults.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_crc.h</file>
+      <file>$TOOLKIT_DIR$\inc\c\DLib_Config_Normal.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\CMSIS\Include\core_cmInstr.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\misc.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\BeeOS.o</file>
+      <file>$PROJ_DIR$\Debug\Obj\stm32f4xx_it.o</file>
+      <file>$TOOLKIT_DIR$\inc\c\stdint.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_gpio.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\CMSIS\Include\core_cm4.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_hash.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_tim.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_fsmc.h</file>
+      <file>$TOOLKIT_DIR$\inc\c\yvals.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_dcmi.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\stm32f4xx_it.pbi</file>
+      <file>$TOOLKIT_DIR$\inc\c\cmsis_iar.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_iwdg.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_spi.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_dma.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\startup_stm32f40_41xxx.o</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\CMSIS\Device\ST\STM32F4xx\Include\system_stm32f4xx.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\CMSIS\Include\core_cmFunc.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\system_stm32f4xx.o</file>
+      <file>$PROJ_DIR$\BeeOS.h</file>
+      <file>$PROJ_DIR$\BeeOS_Tasks.h</file>
+      <file>$PROJ_DIR$\stm32f4xx_it.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_gpio.c</file>
+      <file>$PROJ_DIR$\BeeOS.c</file>
+      <file>$PROJ_DIR$\system_stm32f4xx.c</file>
+      <file>$PROJ_DIR$\main.c</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\CMSIS\Device\ST\STM32F4xx\Source\Templates\iar\startup_stm32f40_41xxx.s</file>
+      <file>$PROJ_DIR$\stm32f4xx_it.c</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_rcc.c</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_wwdg.h</file>
+      <file>$TOOLKIT_DIR$\inc\c\DLib_Product.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_rng.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_can.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\First.pbd</file>
+      <file>$TOOLKIT_DIR$\inc\c\xencoding_limits.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\stm32f4xx_rcc.o</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_usart.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\CMSIS\Include\core_cmSimd.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_dac.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_rtc.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\system_stm32f4xx.pbi</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_adc.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_pwr.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_syscfg.h</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_cryp.h</file>
+      <file>$PROJ_DIR$\Debug\Obj\stm32f4xx_rcc.pbi</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h</file>
+      <file>$TOOLKIT_DIR$\lib\shb_l.a</file>
+      <file>$TOOLKIT_DIR$\lib\rt7M_tl.a</file>
+      <file>$TOOLKIT_DIR$\lib\m7M_tls.a</file>
+      <file>$PROJ_DIR$\..\..\..\Common\ST\icf\stm32f407xE_flash.icf</file>
+      <file>$TOOLKIT_DIR$\lib\dl7M_tln.a</file>
+    </outputs>
+    <file>
+      <name>[ROOT_NODE]</name>
+      <outputs>
+        <tool>
+          <name>ILINK</name>
+          <file> 18</file>
+        </tool>
+      </outputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\Debug\Exe\c.out</name>
+      <inputs>
+        <tool>
+          <name>ILINK</name>
+          <file> 79 29 21 44 12 30 64 47 76 77 78 80</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_gpio.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 23</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 12</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 9</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 75 33 66 24 16 43 68 31 59 2 35 61 15 45 27 63 26 40 25 7 71 42 58 34 38 32 4 46 37 3 13 70 14 8 41 11 72 65 28 73 60 67 36</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 32 75 33 31 16 37 24 26 59 63 3 27 40 13 46 66 45 4 70 25 14 43 8 7 2 41 71 15 68 11 42 72 35 65 58 28 73 34 60 61 67 38 36</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\BeeOS.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 6</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 29</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 5</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 45 61 59 2 75 49 31 35 33 24 16 43 68 15 48 46 63 26 40 25 7 71 42 58 34 38 4 27 66 37 3 13 70 14 8 32 41 11 72 65 28 73 60 67 36</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 75 33 31 16 37 24 26 59 63 3 27 40 13 46 66 45 4 70 25 14 43 8 7 32 2 41 71 15 68 11 42 72 35 65 58 28 73 34 60 61 67 38 36 48 49</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\system_stm32f4xx.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 69</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 47</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 17</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 70 75 31 65 13 41 67 33 3 37 16 8 11 73 45 4 46 14 32 15 72 28 60 36 27 66 24 63 26 59 40 25 43 7 2 71 68 42 35 58 34 61 38</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 75 33 31 16 37 24 26 59 63 3 27 40 13 46 66 45 4 70 25 14 43 8 7 32 2 41 71 15 68 11 42 72 35 65 58 28 73 34 60 61 67 38 36</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\main.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 19</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 21</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 20</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 40 34 63 26 7 75 45 16 42 48 27 25 71 58 38 15 33 31 66 24 59 43 2 68 35 61 4 46 37 3 13 70 14 8 32 41 11 72 65 28 73 60 67 36</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 75 33 31 16 37 24 26 59 63 3 27 40 13 46 66 45 4 70 25 14 43 8 7 32 2 41 71 15 68 11 42 72 35 65 58 28 73 34 60 61 67 38 36 48</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\CMSIS\Device\ST\STM32F4xx\Source\Templates\iar\startup_stm32f40_41xxx.s</name>
+      <outputs>
+        <tool>
+          <name>AARM</name>
+          <file> 44</file>
+        </tool>
+      </outputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\stm32f4xx_it.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 39</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 30</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 1</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 70 75 33 31 65 13 41 67 3 37 16 8 11 73 10 45 4 46 14 32 15 72 28 60 36 50 27 66 24 63 26 59 40 25 43 7 2 71 68 42 35 58 34 61 38</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 50 10 75 33 31 16 37 24 26 59 63 3 27 40 13 46 66 45 0 70 25 14 43 8 7 32 2 41 71 15 68 11 42 72 35 65 58 28 73 34 60 61 67 38 36</file>
+        </tool>
+      </inputs>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\..\..\Common\ST\STM32F4xx_DSP_StdPeriph_Lib_V1.5.1\Libraries\STM32F4xx_StdPeriph_Driver\src\stm32f4xx_rcc.c</name>
+      <outputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 74</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 64</file>
+        </tool>
+        <tool>
+          <name>__cstat</name>
+          <file> 22</file>
+        </tool>
+      </outputs>
+      <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 75 8 3 37 73 16 11 31 13 70 41 65 67 33 4 46 14 32 15 72 28 60 36 45 27 66 24 63 26 59 40 25 43 7 2 71 68 42 35 58 34 61 38</file>
+        </tool>
+        <tool>
+          <name>ICCARM</name>
+          <file> 15 75 33 31 16 37 24 26 59 63 3 27 40 13 46 66 45 4 70 25 14 43 8 7 32 2 41 71 68 11 42 72 35 65 58 28 73 34 60 61 67 38 36</file>
+        </tool>
+      </inputs>
+    </file>
+  </configuration>
+  <configuration>
+    <name>Release</name>
+    <outputs/>
+    <forcedrebuild>
+      <name>[MULTI_TOOL]</name>
+      <tool>ILINK</tool>
+    </forcedrebuild>
+  </configuration>
+</project>
+
+
