@@ -1,10 +1,22 @@
 #include "stm32f4xx.h"
 #include "stm32f4xx_rcc.h"
 //#include "stm32f10x_gpio.h"
+#include "heap.h"
 
 #include "BeeOS.h"
 
-volatile int a;
+volatile unsigned long a,b,c;
+
+
+#define UNUSED(x) ((void)(x))
+
+#define __HAL_RCC_GPIOA_CLK_ENABLE()   do { \
+                                        __IO uint32_t tmpreg = 0x00U; \
+                                        SET_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOAEN);\
+                                        /* Delay after an RCC peripheral clock enabling */ \
+                                        tmpreg = READ_BIT(RCC->AHB1ENR, RCC_AHB1ENR_GPIOAEN);\
+                                        UNUSED(tmpreg); \
+                                          } while(0U)
 
 
 #if 0
@@ -37,6 +49,7 @@ extern void SetRegs(void);
 typedef enum 
 {
   LED1 = 0,
+  LED2  
 } Led_TypeDef;
   
 volatile unsigned long val1=10;
@@ -46,30 +59,57 @@ volatile unsigned long* pval1=&val1;
 volatile unsigned long* pval2=&val2;
 
 
-#define LEDn                             1
+#define LEDn                             2
 
-#define LED_PIN                         GPIO_Pin_12
-#define LED_GPIO_PORT                   GPIOD
-#define LED_GPIO_CLK                    RCC_AHB1Periph_GPIOD  
+#define LED_PIN1                         GPIO_Pin_6
+#define LED_GPIO_PORT1                   GPIOA
+#define LED_GPIO_CLK1                    RCC_AHB1Periph_GPIOA  
   
 
-GPIO_TypeDef* GPIO_PORT[LEDn] = {LED_GPIO_PORT};
-const uint16_t GPIO_PIN[LEDn] = {LED_PIN};
-const uint32_t GPIO_CLK[LEDn] = {LED_GPIO_CLK};
+#define LED_PIN2                         GPIO_Pin_7
+#define LED_GPIO_PORT2                   GPIOA
+#define LED_GPIO_CLK2                    RCC_AHB1Periph_GPIOA 
+
+
+GPIO_TypeDef* GPIO_PORT[LEDn] = {LED_GPIO_PORT1,LED_GPIO_PORT2};
+const uint16_t GPIO_PIN[LEDn] = {LED_PIN1,LED_PIN2};
+const uint32_t GPIO_CLK[LEDn] = {LED_GPIO_CLK1,LED_GPIO_CLK2};
 
 void LEDInit(Led_TypeDef Led)
 {
+  
+  
+__HAL_RCC_GPIOA_CLK_ENABLE();  
+  
+  
   GPIO_InitTypeDef  GPIO_InitStructure;
   
   /* Enable the GPIO_LED Clock */
-  RCC_APB2PeriphClockCmd(GPIO_CLK[Led], ENABLE);
+//  RCC_APB1PeriphClockCmd(GPIO_CLK[Led], ENABLE);
 
   /* Configure the GPIO_LED pin */
-  GPIO_InitStructure.GPIO_Pin = GPIO_PIN[Led];
+  GPIO_InitStructure.GPIO_Pin = GPIO_PIN[0]|GPIO_PIN[1];
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
   GPIO_Init(GPIO_PORT[Led], &GPIO_InitStructure);
+  GPIO_SetBits(GPIO_PORT[0],GPIO_Pin_6|GPIO_Pin_7);
+  GPIO_ResetBits(GPIO_PORT[0],GPIO_Pin_6|GPIO_Pin_7);
+  
+
+
+
+  //GPIO_InitTypeDef  GPIO_InitStructure;
+#if 0  
+  /* Enable the GPIO_LED Clock */
+  RCC_APB1PeriphClockCmd(GPIO_CLK[Led], ENABLE);
+
+  /* Configure the GPIO_LED pin */
+  GPIO_InitStructure.GPIO_Pin = GPIO_PIN[Led];
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+  GPIO_Init(GPIO_PORT[Led], &GPIO_InitStructure);  
+#endif
 }
 
 void LEDOn(Led_TypeDef Led)
@@ -107,6 +147,7 @@ void SysTick_Handler(void)
 
 CRITICAL_SECTION csRead;  
 CRITICAL_SECTION csWrite; 
+CRITICAL_SECTION cs;
 
 void Sleep2(unsigned long SleepTime)
 {
@@ -115,81 +156,84 @@ void Sleep2(unsigned long SleepTime)
        );  
 }
 
+
+
+
+void lock_mutex(void* mutex)
+{
+#if 0  
+  __asm(
+//        "       LDR r1, =#1           \n"
+          "       MOV r1, #1           \n"        
+          "m1:       LDREX r2, [r0]    \n"
+          "       CMP r2, r1           \n" // ; Test if mutex is locked or unlocked
+          "       ITEE  EQ             \n" //; If locked - wait for it to be released, from 2            
+//          "       bx   m2               \n" //; If locked - wait for it to be released, from 2
+          "       STREX r2, r1, [r0] \n" //Not locked, attempt to lock it
+          "       CMP r2, #1         \n" //Check if Store-Exclusive failed
+//          "       BEQ m1              \n" //Failed - retry from 1
+
+//          "       DMB                  \n" //Required before accessing protected resource
+//          "       BX lr                \n"
+          "m2:                  \n" //Retry from 1
+       );
+#endif  
+}  
+
+HANDLE hMutex;
+HANDLE hSem1, hSem2;
+void MainTask(void)
+{ 
+//  InitializeCriticalSection(&cs);
+//  CreateMutex(&hMutex, 1);
+  hSem1=CreateSemaphore(0, 1);
+  hSem2=CreateSemaphore(0, 1);
+  Sleep(1000);
+  ResumeTask(2);  
+  ResumeTask(3);
+  ReleaseSemaphore(hSem1,1);
+  Sleep(INFINITE);
+  while(1);
+}
+
 void Task1(void)
 { 
-  Sleep(INFINITE);
   while(1)
   {
-    Sleep(256);    
+    WaitForSingleObject(hSem1);  
+    Sleep(500);
     LEDOn(LED1); 
-    Sleep(256);    
-    LEDOff(LED1);    
-  } 
-    
-  __asm(  
-        "     push {r0-r4}\n"
-	"     ldr r4, pval1\n"
-	"     ldr r1, [r4]\n"          
-        "     mov r0, #1\n"
-//        "     bl Sleep2\n"   
-        "     svc   1  \n"          
-        "     mov r2,#1\n"   
-        "     add r1,r1,#1\n"  
-	"     str r1,[r4]\n"
-        "     pop {r0-r4}\n"   
-       );  
-  
-//  while(1);
-/*  
-  InitializeCriticalSection(&csRead);
-  InitializeCriticalSection(&csWrite);  
-  EnterCriticalSection(&csRead);
-  Sleep(2);
-  LeaveCriticalSection(&csRead);  
-*/  
-  while(1)
-  {
-//    Sleep(INFINITE);
-    Sleep(256);    
-    LEDOn(LED1); 
-    Sleep(10);    
-    LEDOff(LED1);    
-  } 
-  
+    ReleaseSemaphore(hSem2,1);    
+  }
 }
 
 void Task2(void)
 {
-/*  
-  __asm(  
-        "     push {r0-r4}\n"
-	"     ldr r4, pval1\n"
-	"     ldrex r1, [r4]\n"          
-        "     mov r0, #2\n"
-//        "     svc   1  \n"       
-        "     mov r2,#1\n"   
-        "     add r1,r1,#1\n"  
-	"     strex r2,r1,[r4]\n"
-        "     pop {r0-r4}\n"   
-       );  
-*/  
-//  Sleep(10000);  
-  ResumeThread(0);  
-  while(1);  
-
-/*  
-  EnterCriticalSection(&csRead);  
   while(1)
   {
-    Sleep(10);    
-    LEDOn(LED1); 
-    Sleep(5);    
-    LEDOff(LED1);  
-  }
-*/  
+    WaitForSingleObject(hSem2);
+    Sleep(500);
+    LEDOff(LED1); 
+    ReleaseSemaphore(hSem1,1);    
+  }    
 }
 
+void Task3(void)
+{
+  WaitForSingleObject(hSem1);
+//  Sleep(15);
+//  ReleaseMutex(&hMutex);  
+  Sleep(INFINITE);  
+  while(1);    
+}
 
+void Task4(void)
+{
+  WaitForSingleObject(hSem1);
+  Sleep(15);
+  Sleep(INFINITE);  
+  while(1);    
+}
 
 unsigned long addr1, addr2;
 
@@ -201,15 +245,16 @@ HANDLE CreateThread(SIZE_T dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress)
   
 }
 */
-
 void Test()
 {
-//  val1++;
+  //unsigned long val=0;
+//  unsigned long* pval=&val;
+  
 
 #if 0  
   __asm(  
         "     push {r0-r4}\n"
-	"     ldr r0, pval1\n"
+	"     ldr r0, pval\n"
 	"     ldr r1, [r0]\n"          
 //        "     mov r2,#1\n"   
         "     add r1,r1,#1\n"  
@@ -219,53 +264,40 @@ void Test()
 #else
   __asm(  
         "     push {r0-r4}\n"
-	"     ldr r0, pval1\n"
-	"     ldrex r1, [r0]\n"          
-	"     ldrex r3, [r0]\n"               
-        "     mov r2,#1\n"   
-        "     add r1,r1,#1\n"  
-	"     strex r2,r1,[r0]\n"
-	"     strex r2,r1,[r0]\n"          
+	"     ldr.n r0, pval1\n"
+	"     ldr.n r4, pval2\n"
+
+        "     mov r7,#1\n"            
+	"     ldrex r1, [r0]\n"  
+	"     ldrex r5, [r4]\n"               
+ 
+	"     strex r2,r7,[r0]\n"          
+        "     isb      \n"   
+        "     dmb      \n"             
+        "     dsb      \n"             
+          
+//	"     ldrex r5, [r4]\n"            
+        "     strex r6,r7,[r4]\n"
+          
         "     pop {r0-r4}\n"   
+        "     bx lr \n"  
+        "     dc16    0                       \n"           
+        "pval1:                  \n"
+        "     dc32    val1            \n"             
+        "pval2:                  \n"
+        "     dc32    val2            \n"               
        );
   
 #endif  
 }  
 
-static volatile int a;
-
-void myfoo(void)
-{
-  __asm(   
-          "     ldr.n   r4,ma\n"
-          "     nop\n"  
-          "     ldr.n   r2,[r4]\n"            
-          "     BX     LR      \n"  
-            "ma:     DC32   a   \n"                         
-       );  
-}
-
-
+volatile float x,y,z;
+volatile unsigned long v;
+uint8_t* p;
 void main()
 {
-
-  a=4;
-//  InitTCB(0, (unsigned long)Task1);
-//  InitTCB(1, (unsigned long)Task2);
-//  Test();
   LEDInit(LED1);
-
- 
-//  vConfigureTimerForRunTimeStats();
-//	*(portNVIC_SYSPRI2) |= portNVIC_PENDSV_PRI;
-//	*(portNVIC_SYSPRI2) |= portNVIC_SYSTICK_PRI;  
-//  NVIC_IntEnable(NVIC_TIMER0);
-//  NVIC_IntPri(NVIC_TIMER0,HIGHEST_PRIORITY);
   __enable_interrupt();
-//  __disable_interrupt();
-//	*(portNVIC_SYSTICK_LOAD) = 0xFFFFFF - 1UL;
-//	*(portNVIC_SYSTICK_CTRL) = portNVIC_SYSTICK_CLK | portNVIC_SYSTICK_INT | portNVIC_SYSTICK_ENABLE;
-//  SetRegs();
-  SysTick_Config(SystemCoreClock/1000);        
+  SysTick_Config(SystemCoreClock/1000);
   StartFirstTask();
 }
