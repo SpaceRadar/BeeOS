@@ -1,12 +1,6 @@
 #include "stm32f4xx.h"
 #include "stm32f4xx_rcc.h"
-//#include "stm32f10x_gpio.h"
-#include "heap.h"
-
 #include "BeeOS.h"
-
-volatile unsigned long a,b,c;
-
 
 #define UNUSED(x) ((void)(x))
 
@@ -19,30 +13,7 @@ volatile unsigned long a,b,c;
                                           } while(0U)
 
 
-#if 0
-/* Constants required to manipulate the NVIC. */
-#define portNVIC_SYSTICK_CTRL		( ( volatile unsigned long *) 0xe000e010 )
-#define portNVIC_SYSTICK_LOAD		( ( volatile unsigned long *) 0xe000e014 )
-#define portNVIC_INT_CTRL			( ( volatile unsigned long *) 0xe000ed04 )
-#define portNVIC_SYSPRI2			( ( volatile unsigned long *) 0xe000ed20 )
-#define portNVIC_SYSTICK_CLK		0x00000004
-#define portNVIC_SYSTICK_INT		0x00000002
-#define portNVIC_SYSTICK_ENABLE		0x00000001
-#define portNVIC_PENDSVSET			0x10000000
-#define portNVIC_PENDSV_PRI			( ( ( unsigned long ) configKERNEL_INTERRUPT_PRIORITY ) << 16 )
-#define portNVIC_SYSTICK_PRI		( ( ( unsigned long ) configKERNEL_INTERRUPT_PRIORITY ) << 24 )
 
-#define configPRIO_BITS       5        /* 32 priority levels */
-#endif
-
-
-volatile unsigned long task=0;
-volatile unsigned long current_task_count=0;
-
-#define STACK_SIZE 64
-#define MAX_TASK_COUNT 4
-
-extern void SetRegs(void);
 
 
 
@@ -138,47 +109,6 @@ void Delay_ms(unsigned long del)
 
 int led=0; 
 
-void SysTick_Handler(void)
-{
-//  task=!task;
-  //SCB-> ICSR = SCB_ICSR_PENDSVSET;
-  *(portNVIC_INT_CTRL) = portNVIC_PENDSVSET;  
-}
-
-CRITICAL_SECTION csRead;  
-CRITICAL_SECTION csWrite; 
-CRITICAL_SECTION cs;
-
-void Sleep2(unsigned long SleepTime)
-{
-  __asm( 
-        "     svc   9  \n"
-       );  
-}
-
-
-
-
-void lock_mutex(void* mutex)
-{
-#if 0  
-  __asm(
-//        "       LDR r1, =#1           \n"
-          "       MOV r1, #1           \n"        
-          "m1:       LDREX r2, [r0]    \n"
-          "       CMP r2, r1           \n" // ; Test if mutex is locked or unlocked
-          "       ITEE  EQ             \n" //; If locked - wait for it to be released, from 2            
-//          "       bx   m2               \n" //; If locked - wait for it to be released, from 2
-          "       STREX r2, r1, [r0] \n" //Not locked, attempt to lock it
-          "       CMP r2, #1         \n" //Check if Store-Exclusive failed
-//          "       BEQ m1              \n" //Failed - retry from 1
-
-//          "       DMB                  \n" //Required before accessing protected resource
-//          "       BX lr                \n"
-          "m2:                  \n" //Retry from 1
-       );
-#endif  
-}  
 
 HANDLE hMutex;
 HANDLE hSem1, hSem2;

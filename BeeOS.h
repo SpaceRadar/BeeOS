@@ -80,6 +80,15 @@ typedef struct
   uint32_t semaphore_max_count;
 }semaphore_t;
 
+typedef struct
+{
+  uint32_t                StackSize;
+  LPTHREAD_START_ROUTINE StartAddress;
+  void*                  Parameter;
+  uint32_t               CreationFlags;
+  uint32_t               TaskId;
+}create_task_t;
+
 typedef unsigned long  CRITICAL_SECTION;
 typedef unsigned long* LPCRITICAL_SECTION;
 
@@ -104,5 +113,9 @@ void ReleaseMutex (HANDLE handle);
 HANDLE CreateSemaphore (uint32_t InitialCount, uint32_t MaximumCount);
 void ReleaseSemaphore (HANDLE handle, uint32_t ReleaseCount);
 
-
+tid_t CreateTask(uint32_t               StackSize, 
+                 LPTHREAD_START_ROUTINE StartAddress, 
+                 void*                  Parameter,
+                 uint32_t               CreationFlags,
+                 uint32_t               TaskId);
 #endif

@@ -16,7 +16,7 @@ TypeViolation=1
 UnspecRange=1
 ActionState=1
 [DebugChecksum]
-Checksum=98105223
+Checksum=862517277
 [Exceptions]
 StopOnUncaught=_ 0
 StopOnThrow=_ 0
@@ -88,23 +88,6 @@ ProbeSetup0=2 1 1 2 0 0
 Enabled=_ 0
 [array_types]
 Fmt0=unsigned long[64]	4	0
-[DriverProfiling]
-Enabled=0
-Mode=1
-Graph=0
-Symbiont=0
-Exclusions=
-[CallStackLog]
-Enabled=0
-[CallStackStripe]
-ShowTiming=1
-[Log file]
-LoggingEnabled=_ 0
-LogFile=_ ""
-Category=_ 0
-[TermIOLog]
-LoggingEnabled=_ 0
-LogFile=_ ""
 [InterruptLog]
 LogEnabled=0
 GraphEnabled=0
@@ -121,17 +104,17 @@ ShowTimeSum=1
 [Disassemble mode]
 mode=0
 [Breakpoints2]
-Bp0=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.297.3" 0 0 1 "" 0 ""
+Bp0=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.305.3" 0 0 1 "" 0 ""
 Bp1=_ 0 "STD_CODE2" "0x080002FE" 0 0 1 "" 0 ""
-Bp2=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.211.3" 0 0 1 "" 0 ""
-Bp3=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS_Tasks.h}.10.3" 0 0 1 "" 0 ""
-Bp4=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.120.3" 0 0 1 "" 0 ""
-Bp5=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.123.5" 0 0 1 "" 0 ""
-Bp6=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.124.5" 0 0 1 "" 0 ""
-Bp7=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.125.5" 0 0 1 "" 0 ""
-Bp8=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.126.5" 0 0 1 "" 0 ""
-Bp9=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.106.3" 0 0 1 "" 0 ""
-Bp10=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.270.3" 0 0 1 "" 0 ""
+Bp2=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.204.3" 0 0 1 "" 0 ""
+Bp3=_ 0 "STD_CODE2" "{$PROJ_DIR$\BeeOS_Tasks.h}.10.3" 0 0 1 "" 0 ""
+Bp4=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.122.3" 0 0 1 "" 0 ""
+Bp5=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.123.1" 0 0 1 "" 0 ""
+Bp6=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.182.3" 0 0 1 "" 0 ""
+Bp7=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.182.3" 0 0 1 "" 0 ""
+Bp8=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.182.3" 0 0 1 "" 0 ""
+Bp9=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.105.3" 0 0 1 "" 0 ""
+Bp10=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.292.3" 0 0 1 "" 0 ""
 Count=11
 [Interrupts]
 Enabled=1
@@ -141,9 +124,26 @@ Manual=0
 Ddf=1
 TypeViol=0
 Stop=1
+[DriverProfiling]
+Enabled=0
+Mode=1
+Graph=0
+Symbiont=0
+Exclusions=
 [Trace1]
 Enabled=0
 ShowSource=1
+[CallStackLog]
+Enabled=0
+[CallStackStripe]
+ShowTiming=1
+[Log file]
+LoggingEnabled=_ 0
+LogFile=_ ""
+Category=_ 0
+[TermIOLog]
+LoggingEnabled=_ 0
+LogFile=_ ""
 [Aliases]
 Count=0
 SuppressDialog=0

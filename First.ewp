@@ -154,12 +154,12 @@
         <option>
           <name>FPU2</name>
           <version>0</version>
-          <state>4</state>
+          <state>0</state>
         </option>
         <option>
           <name>NrRegs</name>
           <version>0</version>
-          <state>1</state>
+          <state>0</state>
         </option>
         <option>
           <name>NEON</name>
@@ -1946,6 +1946,12 @@
   </file>
   <file>
     <name>$PROJ_DIR$\BeeOS_Tasks.h</name>
+  </file>
+  <file>
+    <name>$PROJ_DIR$\heap.h</name>
+  </file>
+  <file>
+    <name>$PROJ_DIR$\heap_1.c</name>
   </file>
   <file>
     <name>$PROJ_DIR$\main.c</name>

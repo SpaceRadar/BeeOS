@@ -108,6 +108,14 @@ void ReleaseSemaphore (HANDLE handle, uint32_t ReleaseCount)
        );    
 }
 
+void CreateTaskAdapter(create_task_t* create_task)
+{
+  __asm( 
+        "     isb      \n"          
+        "     svc   9  \n"
+       );   
+}
+
 #pragma diag_suppress=Pe940 
 void* AllocateMem(uint32_t size)
 {
@@ -145,6 +153,25 @@ HANDLE CreateSemaphore(uint32_t InitialCount, uint32_t MaximumCount)
   }
   return (HANDLE) handle;
 }
+
+
+tid_t CreateTask(uint32_t               StackSize, 
+                 LPTHREAD_START_ROUTINE StartAddress, 
+                 void*                  Parameter,
+                 uint32_t               CreationFlags,
+                 uint32_t               TaskId)
+{
+  create_task_t create_task;
+  
+  create_task.StackSize=StackSize;
+  create_task.StartAddress=StartAddress;
+  create_task.Parameter=Parameter;
+  create_task.CreationFlags=CreationFlags;
+  CreateTaskAdapter(&create_task);  
+  
+  return create_task.TaskId;
+}
+
 
 void InitStack(unsigned long taskId, LPTHREAD_START_ROUTINE lpStartAddress)
 {
@@ -192,6 +219,11 @@ void InitStack(unsigned long taskId, LPTHREAD_START_ROUTINE lpStartAddress)
   *(--SP)= 0x44444444;
   
   TCB[taskId].SP=SP;
+}
+
+void SysTick_Handler(void)
+{
+  *(portNVIC_INT_CTRL) = portNVIC_PENDSVSET;  
 }
 
 void PendSV_Handler(void)
@@ -305,7 +337,7 @@ void StartFirstTask()
         "     cpsie i              \n"
         "     svc   0              \n"
 //        "     dc16  0x0000         \n"          //Just for align data  
-//        "     dc16  0x0000         \n"          //Just for align data            
+        "     dc16  0x0000         \n"          //Just for align data            
         "vtor_addr:                 \n"
         "     dc32  0xE000ED08     \n"          //Vector Table Offset Register
        );
