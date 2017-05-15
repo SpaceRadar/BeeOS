@@ -1,16 +1,20 @@
 #ifndef BEEOS_H
 #define BEEOS_H
 
-#define STACK_SIZE 64
+#define STACK_SIZE      64
+#define MAX_TASK_COUNT  32
 
+#define INVALID_TID     0xFFFFFFFF
 
 #define READY_TASK            0x00000000
 #define SLEEP_TASK            0x00010000
 #define WAITING_HANDLE        0x00020000
 #define SUSPEND_TASK          0x00040000
+#define IDLE_TASK             0x00080000
 #define ZOMBIE_TASK           0x80000000
 
 #define CREATE_SUSPENDED      SUSPEND_TASK
+#define CREATE_IDLE_TASK      IDLE_TASK
 
 
 #define HANDLE_TYPE_MUTEX     0x20000000
@@ -43,18 +47,17 @@
 #endif
 
 
-typedef void (*LPTHREAD_START_ROUTINE) (void);
+typedef void (*LPTHREAD_START_ROUTINE) (void*);
 typedef uint32_t tid_t;
 typedef uint32_t HANDLE;
 typedef struct
 {
-  unsigned long* SP;
-  unsigned long State;
-  LPTHREAD_START_ROUTINE lpStartAddress;
+  uint32_t* SP;
+  uint32_t State;
+  LPTHREAD_START_ROUTINE StartAddress;
   unsigned long StackSize;
-  unsigned long SleepParam;
-  uint32_t next_wait_task_id;
-  uint32_t prev_wait_task_id;   
+  void* Parameter;
+  uint32_t SleepParam; 
 } TCB_t;
 
 typedef struct
@@ -82,7 +85,7 @@ typedef struct
 
 typedef struct
 {
-  uint32_t                StackSize;
+  uint32_t               StackSize;
   LPTHREAD_START_ROUTINE StartAddress;
   void*                  Parameter;
   uint32_t               CreationFlags;
@@ -92,7 +95,7 @@ typedef struct
 typedef unsigned long  CRITICAL_SECTION;
 typedef unsigned long* LPCRITICAL_SECTION;
 
-void InitStack(unsigned long taskId, LPTHREAD_START_ROUTINE lpStartAddress);
+void InitStack(TCB_t* TCB);
 void StartFirstTask();
 
 
@@ -101,6 +104,10 @@ void Sleep(unsigned long SleepTime);
 int InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
 int EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
 int LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+
+
+static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id);
+
 
 //HANDLE GetCurrentThread();
 
@@ -116,6 +123,18 @@ void ReleaseSemaphore (HANDLE handle, uint32_t ReleaseCount);
 tid_t CreateTask(uint32_t               StackSize, 
                  LPTHREAD_START_ROUTINE StartAddress, 
                  void*                  Parameter,
-                 uint32_t               CreationFlags,
-                 uint32_t               TaskId);
+                 uint32_t               CreationFlags);
+
+tid_t CreateTaskPrev(uint32_t               StackSize, 
+                     LPTHREAD_START_ROUTINE StartAddress, 
+                     void*                  Parameter,
+                     uint32_t               CreationFlags);
+
+tid_t CreateIdleTask(uint32_t               StackSize, 
+                     LPTHREAD_START_ROUTINE StartAddress, 
+                     void*                  Parameter,
+                     uint32_t               CreationFlags,
+                     uint32_t               TaskId);
+
+
 #endif

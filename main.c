@@ -112,13 +112,13 @@ int led=0;
 
 HANDLE hMutex;
 HANDLE hSem1, hSem2;
-void MainTask(void)
+void MainTask(void* param)
 { 
 //  InitializeCriticalSection(&cs);
 //  CreateMutex(&hMutex, 1);
   hSem1=CreateSemaphore(0, 1);
   hSem2=CreateSemaphore(0, 1);
-  Sleep(1000);
+//  Sleep(1000);
   ResumeTask(2);  
   ResumeTask(3);
   ReleaseSemaphore(hSem1,1);
@@ -126,7 +126,7 @@ void MainTask(void)
   while(1);
 }
 
-void Task1(void)
+void Task1(void* param)
 { 
   while(1)
   {
@@ -137,7 +137,7 @@ void Task1(void)
   }
 }
 
-void Task2(void)
+void Task2(void* param)
 {
   while(1)
   {
@@ -148,7 +148,7 @@ void Task2(void)
   }    
 }
 
-void Task3(void)
+void Task3(void* param)
 {
   WaitForSingleObject(hSem1);
 //  Sleep(15);
@@ -157,7 +157,7 @@ void Task3(void)
   while(1);    
 }
 
-void Task4(void)
+void Task4(void* param)
 {
   WaitForSingleObject(hSem1);
   Sleep(15);
@@ -229,5 +229,6 @@ void main()
   LEDInit(LED1);
   __enable_interrupt();
   SysTick_Config(SystemCoreClock/1000);
+  CreateTaskPrev(64,MainTask,0,0);
   StartFirstTask();
 }

@@ -16,7 +16,7 @@ TypeViolation=1
 UnspecRange=1
 ActionState=1
 [DebugChecksum]
-Checksum=862517277
+Checksum=444237125
 [Exceptions]
 StopOnUncaught=_ 0
 StopOnThrow=_ 0
@@ -104,18 +104,16 @@ ShowTimeSum=1
 [Disassemble mode]
 mode=0
 [Breakpoints2]
-Bp0=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.305.3" 0 0 1 "" 0 ""
-Bp1=_ 0 "STD_CODE2" "0x080002FE" 0 0 1 "" 0 ""
-Bp2=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.204.3" 0 0 1 "" 0 ""
-Bp3=_ 0 "STD_CODE2" "{$PROJ_DIR$\BeeOS_Tasks.h}.10.3" 0 0 1 "" 0 ""
-Bp4=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.122.3" 0 0 1 "" 0 ""
-Bp5=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.123.1" 0 0 1 "" 0 ""
-Bp6=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.182.3" 0 0 1 "" 0 ""
-Bp7=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.182.3" 0 0 1 "" 0 ""
-Bp8=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.182.3" 0 0 1 "" 0 ""
-Bp9=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.105.3" 0 0 1 "" 0 ""
-Bp10=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.292.3" 0 0 1 "" 0 ""
-Count=11
+Bp0=_ 0 "STD_CODE2" "0x080002FE" 0 0 1 "" 0 ""
+Bp1=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.242.3" 0 0 1 "" 0 ""
+Bp2=_ 0 "STD_CODE2" "{$PROJ_DIR$\main.c}.235.1" 0 0 1 "" 0 ""
+Bp3=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.242.3" 0 0 1 "" 0 ""
+Bp4=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.340.3" 0 0 1 "" 0 ""
+Bp5=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.374.9" 0 0 1 "" 0 ""
+Bp6=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.285.3" 0 0 1 "" 0 ""
+Bp7=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.232.3" 0 0 1 "" 0 ""
+Bp8=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.233.3" 0 0 1 "" 0 ""
+Count=9
 [Interrupts]
 Enabled=1
 [MemConfig]

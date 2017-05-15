@@ -8,7 +8,7 @@
 #include "heap.h"
 
 #define IDLE_TASK_ID 0
-extern TCB_t TCB[];
+TCB_t* TCB[MAX_TASK_COUNT];
 
 static unsigned long ReadyTasksCurrent=0;
 static unsigned long ReadyTasks=0;
@@ -18,7 +18,8 @@ static unsigned long SleepTasks=0;
 //static CRITICAL_SECTION_t CRITICAL_SECTION_Array[32];
 
 
-static volatile TCB_t* current_task=TCB;
+static volatile TCB_t* current_task;
+static volatile uint32_t task_count=1;
 static volatile uint32_t first_wait_task_id=0;
 static volatile uint32_t last_wait_task_id=0;
 static volatile unsigned long current_task_id;
@@ -158,8 +159,7 @@ HANDLE CreateSemaphore(uint32_t InitialCount, uint32_t MaximumCount)
 tid_t CreateTask(uint32_t               StackSize, 
                  LPTHREAD_START_ROUTINE StartAddress, 
                  void*                  Parameter,
-                 uint32_t               CreationFlags,
-                 uint32_t               TaskId)
+                 uint32_t               CreationFlags)
 {
   create_task_t create_task;
   
@@ -172,10 +172,26 @@ tid_t CreateTask(uint32_t               StackSize,
   return create_task.TaskId;
 }
 
-
-void InitStack(unsigned long taskId, LPTHREAD_START_ROUTINE lpStartAddress)
+tid_t CreateTaskPrev(uint32_t               StackSize, 
+                     LPTHREAD_START_ROUTINE StartAddress, 
+                     void*                  Parameter,
+                     uint32_t               CreationFlags)
 {
-  unsigned long* SP=&TCB[taskId].SP[STACK_SIZE];
+  create_task_t create_task;
+  
+  create_task.StackSize=StackSize;
+  create_task.StartAddress=StartAddress;
+  create_task.Parameter=Parameter;
+  create_task.CreationFlags=CreationFlags;  
+  SVCHandler_main((uint32_t) &create_task, 9);
+  return create_task.TaskId;  
+}
+
+
+
+void InitStack(TCB_t* TCB)
+{
+  uint32_t* SP=&TCB->SP[STACK_SIZE>>2];
 #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)  
   *(--SP)= 0x00000000;
   *(--SP)= 0x02000000;  //FPSCR
@@ -199,13 +215,13 @@ void InitStack(unsigned long taskId, LPTHREAD_START_ROUTINE lpStartAddress)
 #endif
   
   *(--SP)=0x01000000;
-  *(--SP)= (unsigned long)lpStartAddress;
-  *(--SP)= (unsigned long) BeyondTheTask;
+  *(--SP)= (uint32_t) TCB->StartAddress;
+  *(--SP)= (uint32_t) BeyondTheTask;
   *(--SP)= 0xCCCCCCCC;
   *(--SP)= 0x33333333;
   *(--SP)= 0x22222222;
   *(--SP)= 0x11111111;
-  *(--SP)= 0x00000000;
+  *(--SP)= (uint32_t) TCB->Parameter;// 0x00000000;
   
 
   *(--SP)= 0xBBBBBBBB;  
@@ -218,7 +234,7 @@ void InitStack(unsigned long taskId, LPTHREAD_START_ROUTINE lpStartAddress)
   *(--SP)= 0x55555555;  
   *(--SP)= 0x44444444;
   
-  TCB[taskId].SP=SP;
+  TCB->SP= SP;
 }
 
 void SysTick_Handler(void)
@@ -271,8 +287,8 @@ void coreSheduler(unsigned long bSysTymer)
   {
     idx=__CLZ(SleepTasksTemp);
     SleepTasksTemp^=(0x80000000>>idx); 
-    TCB[idx].SleepParam--;
-    if(!TCB[idx].SleepParam)
+    TCB[idx]->SleepParam--;
+    if(!TCB[idx]->SleepParam)
     {
       SleepTasks^=(0x80000000>>idx); 
       ReadyTasks|=(0x80000000>>idx);            
@@ -282,7 +298,7 @@ void coreSheduler(unsigned long bSysTymer)
   
   if(0==(ReadyTasks | ReadyTasksCurrent))
   {
-    current_task=&TCB[IDLE_TASK_ID];          
+    current_task=TCB[IDLE_TASK_ID];          
   }
   else
   {
@@ -292,38 +308,30 @@ void coreSheduler(unsigned long bSysTymer)
     }
     current_task_id=__CLZ(ReadyTasksCurrent);
     ReadyTasksCurrent^=(0x80000000>>current_task_id); 
-    current_task=&TCB[current_task_id];        
+    current_task=TCB[current_task_id];        
     }   
 }
 
 
 void StartFirstTask()
 {
-  uint32_t idx;
-  for(idx=0;TCB[idx].SP;++idx)
+//  uint32_t idx;
+  CreateTaskPrev(64,IdleTask,(void*) 0, CREATE_IDLE_TASK);
+/*  
+  for(idx=0;TCB[idx]->SP;++idx)
   {
-    InitStack(idx,TCB[idx].lpStartAddress); 
+    InitStack(idx,TCB[idx]->lpStartAddress, TCB[idx]->Param); 
     if(idx>0)
     {
-      if ( !(TCB[idx].State & CREATE_SUSPENDED))
+      if ( !(TCB[idx]->State & CREATE_SUSPENDED))
       {        
         ReadyTasks|=0x80000000 >> idx;
       }
-      else
-      {
-        if(first_wait_task_id)
-        {
-          TCB[first_wait_task_id].prev_wait_task_id=idx;
-        }
-        TCB[idx].next_wait_task_id=first_wait_task_id;        
-        first_wait_task_id=idx;
-
-        if(!last_wait_task_id)
-          last_wait_task_id=idx;
-      }
     }
   }
+  
   ReadyTasksCurrent=ReadyTasks;
+*/  
 //  Sheduler();
 #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)  
   *((__IO uint32_t*) 0xE000EF34)|=0x80000000;  
@@ -337,7 +345,7 @@ void StartFirstTask()
         "     cpsie i              \n"
         "     svc   0              \n"
 //        "     dc16  0x0000         \n"          //Just for align data  
-        "     dc16  0x0000         \n"          //Just for align data            
+//        "     dc16  0x0000         \n"          //Just for align data            
         "vtor_addr:                 \n"
         "     dc32  0xE000ED08     \n"          //Vector Table Offset Register
        );
@@ -349,7 +357,8 @@ void* coreAllocateMem(uint32_t size)
 }
 
 
-uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
+
+static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
 {
 //  uint32_t idx;
 //  uint32_t cs_idx;
@@ -444,13 +453,13 @@ uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       break; 
 */      
     case 6:
-      if(TCB[param].State & SLEEP_TASK)
+      if(TCB[param]->State & SLEEP_TASK)
       {
-        TCB[param].SleepParam=0;      
+        TCB[param]->SleepParam=0;      
       }  
-      TCB[param].State&=~(SLEEP_TASK | SUSPEND_TASK);      
+      TCB[param]->State&=~(SLEEP_TASK | SUSPEND_TASK);      
       SleepTasks&=~(0x80000000>>param); 
-      if(READY_TASK==TCB[param].State);
+      if(READY_TASK==TCB[param]->State);
       {
         ReadyTasks|=(0x80000000>>param);      
         ReadyTasksCurrent|=(0x80000000>>param);           
@@ -541,7 +550,47 @@ uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
         }
       }
       break;
-      
+      case 9:
+        if(CREATE_IDLE_TASK== ((create_task_t*) param)->CreationFlags)
+        {
+          task_id=0;
+        }
+        else
+        {
+          if(task_count<MAX_TASK_COUNT)
+            task_id=task_count;
+          else
+            task_id=INVALID_TID;
+        }
+        if(INVALID_TID!=task_id)
+        {
+          TCB[task_id]=malloc(sizeof(TCB_t));
+          if(TCB[task_id])
+          {
+//            memcpy(TCB[task_count],param,sizeof(TCB_t));
+            TCB[task_id]->StartAddress = ((create_task_t*) param)->StartAddress;
+            TCB[task_id]->Parameter = ((create_task_t*) param)->Parameter;
+            TCB[task_id]->StackSize = ((create_task_t*) param)->StackSize;
+            TCB[task_id]->SP=malloc(((create_task_t*) param)->StackSize);
+            if(TCB[task_id]->SP)
+            {
+              InitStack(TCB[task_count]);
+              ((create_task_t*) param)->TaskId=(uint32_t) TCB[task_id];
+              if(!task_id)
+                task_count++;
+            }
+            else
+            {
+              ((create_task_t*) param)->TaskId=INVALID_TID;
+              free(TCB[task_id]);
+            }            
+          }
+          else
+          {
+              ((create_task_t*) param)->TaskId=INVALID_TID;            
+          }
+        }        
+      break;
     default:while(1);;break;  
   }
   return result;
