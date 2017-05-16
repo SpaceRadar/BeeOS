@@ -16,7 +16,7 @@ TypeViolation=1
 UnspecRange=1
 ActionState=1
 [DebugChecksum]
-Checksum=444237125
+Checksum=-1455307725
 [Exceptions]
 StopOnUncaught=_ 0
 StopOnThrow=_ 0
@@ -86,8 +86,27 @@ Probe0=I0
 ProbeSetup0=2 1 1 2 0 0
 [CodeCoverage]
 Enabled=_ 0
+[struct_types]
+Fmt0=TCB_t-State	4	0
 [array_types]
 Fmt0=unsigned long[64]	4	0
+[DriverProfiling]
+Enabled=0
+Mode=1
+Graph=0
+Symbiont=0
+Exclusions=
+[CallStackLog]
+Enabled=0
+[CallStackStripe]
+ShowTiming=1
+[Log file]
+LoggingEnabled=_ 0
+LogFile=_ ""
+Category=_ 0
+[TermIOLog]
+LoggingEnabled=_ 0
+LogFile=_ ""
 [InterruptLog]
 LogEnabled=0
 GraphEnabled=0
@@ -104,16 +123,14 @@ ShowTimeSum=1
 [Disassemble mode]
 mode=0
 [Breakpoints2]
-Bp0=_ 0 "STD_CODE2" "0x080002FE" 0 0 1 "" 0 ""
-Bp1=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.242.3" 0 0 1 "" 0 ""
-Bp2=_ 0 "STD_CODE2" "{$PROJ_DIR$\main.c}.235.1" 0 0 1 "" 0 ""
-Bp3=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.242.3" 0 0 1 "" 0 ""
-Bp4=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.340.3" 0 0 1 "" 0 ""
-Bp5=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.374.9" 0 0 1 "" 0 ""
-Bp6=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.285.3" 0 0 1 "" 0 ""
-Bp7=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.232.3" 0 0 1 "" 0 ""
-Bp8=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.233.3" 0 0 1 "" 0 ""
-Count=9
+Bp0=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.174.3" 0 0 1 "" 0 ""
+Bp1=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.177.3" 0 0 1 "" 0 ""
+Bp2=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.177.3" 0 0 1 "" 0 ""
+Bp3=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.174.3" 0 0 1 "" 0 ""
+Bp4=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.248.3" 0 0 1 "" 0 ""
+Bp5=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.122.5" 0 0 1 "" 0 ""
+Bp6=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.548.9" 0 0 1 "" 0 ""
+Count=7
 [Interrupts]
 Enabled=1
 [MemConfig]
@@ -122,26 +139,9 @@ Manual=0
 Ddf=1
 TypeViol=0
 Stop=1
-[DriverProfiling]
-Enabled=0
-Mode=1
-Graph=0
-Symbiont=0
-Exclusions=
 [Trace1]
 Enabled=0
 ShowSource=1
-[CallStackLog]
-Enabled=0
-[CallStackStripe]
-ShowTiming=1
-[Log file]
-LoggingEnabled=_ 0
-LogFile=_ ""
-Category=_ 0
-[TermIOLog]
-LoggingEnabled=_ 0
-LogFile=_ ""
 [Aliases]
 Count=0
 SuppressDialog=0

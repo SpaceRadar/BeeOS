@@ -10,19 +10,15 @@
 #define IDLE_TASK_ID 0
 TCB_t* TCB[MAX_TASK_COUNT];
 
-static unsigned long ReadyTasksCurrent=0;
-static unsigned long ReadyTasks=0;
-static unsigned long SleepTasks=0;
-//static unsigned long CriticalSection=0;
-//static unsigned long CriticalSectionUsing=0xFFFFFFFF;
-//static CRITICAL_SECTION_t CRITICAL_SECTION_Array[32];
+static volatile uint32_t ReadyTasksCurrent=0;
+static volatile uint32_t ReadyTasks=0;
+static volatile uint32_t SleepTasks=0;
 
 
 static volatile TCB_t* current_task;
-static volatile uint32_t task_count=1;
-static volatile uint32_t first_wait_task_id=0;
-static volatile uint32_t last_wait_task_id=0;
-static volatile unsigned long current_task_id;
+static volatile uint32_t task_count=0;
+static volatile uint32_t current_task_id;
+static volatile uint32_t beeos_running=0;
 
 static volatile unsigned long addr;
 /*
@@ -117,6 +113,14 @@ void CreateTaskAdapter(create_task_t* create_task)
        );   
 }
 
+void CreateMailBoxAdapter(create_mailbox_t* create_mailbox)
+{
+  __asm( 
+        "     isb      \n"          
+        "     svc   10  \n"
+       );   
+}
+
 #pragma diag_suppress=Pe940 
 void* AllocateMem(uint32_t size)
 {
@@ -155,6 +159,18 @@ HANDLE CreateSemaphore(uint32_t InitialCount, uint32_t MaximumCount)
   return (HANDLE) handle;
 }
 
+HANDLE CreateMailBox(uint32_t maxmsg, uint32_t msgsize)
+{
+  create_mailbox_t create_mailbox;
+  create_mailbox.maxmsg=maxmsg;
+  
+  if(beeos_running)
+    CreateMailBoxAdapter(&create_mailbox);  
+  else
+    SVCHandler_main((uint32_t) &create_mailbox, 10);  
+  return create_mailbox.handle;
+}
+
 
 tid_t CreateTask(uint32_t               StackSize, 
                  LPTHREAD_START_ROUTINE StartAddress, 
@@ -167,27 +183,12 @@ tid_t CreateTask(uint32_t               StackSize,
   create_task.StartAddress=StartAddress;
   create_task.Parameter=Parameter;
   create_task.CreationFlags=CreationFlags;
-  CreateTaskAdapter(&create_task);  
-  
+  if(beeos_running)
+    CreateTaskAdapter(&create_task);  
+  else
+    SVCHandler_main((uint32_t) &create_task, 9);
   return create_task.TaskId;
 }
-
-tid_t CreateTaskPrev(uint32_t               StackSize, 
-                     LPTHREAD_START_ROUTINE StartAddress, 
-                     void*                  Parameter,
-                     uint32_t               CreationFlags)
-{
-  create_task_t create_task;
-  
-  create_task.StackSize=StackSize;
-  create_task.StartAddress=StartAddress;
-  create_task.Parameter=Parameter;
-  create_task.CreationFlags=CreationFlags;  
-  SVCHandler_main((uint32_t) &create_task, 9);
-  return create_task.TaskId;  
-}
-
-
 
 void InitStack(TCB_t* TCB)
 {
@@ -316,7 +317,7 @@ void coreSheduler(unsigned long bSysTymer)
 void StartFirstTask()
 {
 //  uint32_t idx;
-  CreateTaskPrev(64,IdleTask,(void*) 0, CREATE_IDLE_TASK);
+  CreateTask(64,IdleTask,(void*) 0, CREATE_IDLE_TASK);
 /*  
   for(idx=0;TCB[idx]->SP;++idx)
   {
@@ -333,6 +334,7 @@ void StartFirstTask()
   ReadyTasksCurrent=ReadyTasks;
 */  
 //  Sheduler();
+  beeos_running=1;
 #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)  
   *((__IO uint32_t*) 0xE000EF34)|=0x80000000;  
   *((__IO uint32_t*) 0xE000EF34)&=0xBFFFFFFF;    
@@ -365,6 +367,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
 //  uint32_t WakingTask;
   uint32_t task_id;
   uint32_t result=0; 
+  mailbox_t* mailbox;
   switch(svc_id)
   {
     //Sleep
@@ -392,66 +395,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       ReadyTasksCurrent&=~(0x80000000>>current_task_id);
       ReadyTasks&=~(0x80000000>>current_task_id);      
       result=0xFFFFFFFF;       
-      break;
-/*      
-    case 3:
-      
-        cs_idx=__CLZ(CriticalSectionUsing);
-        if(cs_idx<32)
-        {
-          CriticalSectionUsing&=~(0x80000000>>cs_idx);
-          *((LPCRITICAL_SECTION) param)=HANDLE_ID_CRITICAL_SECTION | cs_idx;
-          CRITICAL_SECTION_Array[cs_idx].LockCounter=0;          
-          CRITICAL_SECTION_Array[cs_idx].Owner=0xFFFFFFFF; 
-          CRITICAL_SECTION_Array[cs_idx].LowestWaitPriority=0;
-          CRITICAL_SECTION_Array[cs_idx].TopWaitPriority=0;
-        }
-        else
-        {
-          *((LPCRITICAL_SECTION) param)=0xFFFFFFFF;          
-        }
-      break;
-    case 4:
-//      cs_idx=*(LPCRITICAL_SECTION)param & TASK_ID_MASK;
-      if(CRITICAL_SECTION_Array[cs_idx].Owner==0xFFFFFFFF || 
-         CRITICAL_SECTION_Array[cs_idx].Owner==current_task_id) 
-      {  
-          CRITICAL_SECTION_Array[cs_idx].Owner=current_task_id;
-          ++CRITICAL_SECTION_Array[cs_idx].LockCounter;
-      }
-      else
-      {
-        CRITICAL_SECTION_Array[cs_idx].TaskWaiting|=(0x8000000>>current_task_id);
-        ReadyTasksCurrent&=~(0x80000000>>current_task_id);
-        ReadyTasks&=~(0x80000000>>current_task_id);  
-        current_task->WaitPriority=CRITICAL_SECTION_Array[cs_idx].LowestWaitPriority++;
-        result=0xFFFFFFFF;        
-      }
-      break;         
-    case 5:
-      //cs_idx=*(LPCRITICAL_SECTION)param & TASK_ID_MASK;
-      if(CRITICAL_SECTION_Array[cs_idx].Owner==current_task_id) 
-      {          
-        if(CRITICAL_SECTION_Array[cs_idx].LockCounter)
-        {  
-          if(!(--CRITICAL_SECTION_Array[cs_idx].LockCounter))
-          {
-            CRITICAL_SECTION_Array[cs_idx].Owner=0xFFFFFFFF;
-            ++CRITICAL_SECTION_Array[cs_idx].LockCounter;
-            WakingTask=0;
-            while(!WakingTask)
-            {
-              idx=__CLZ(CRITICAL_SECTION_Array[cs_idx].TaskWaiting);              
-              if(TCB[idx].WaitPriority==CRITICAL_SECTION_Array[cs_idx].TopWaitPriority)
-              {
-                WakingTask=0x80000000>>idx;
-              }              
-            }
-          }
-        }
-      }
-      break; 
-*/      
+      break;     
     case 6:
       if(TCB[param]->State & SLEEP_TASK)
       {
@@ -558,7 +502,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
         else
         {
           if(task_count<MAX_TASK_COUNT)
-            task_id=task_count;
+            task_id=task_count+1;
           else
             task_id=INVALID_TID;
         }
@@ -567,16 +511,25 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           TCB[task_id]=malloc(sizeof(TCB_t));
           if(TCB[task_id])
           {
-//            memcpy(TCB[task_count],param,sizeof(TCB_t));
             TCB[task_id]->StartAddress = ((create_task_t*) param)->StartAddress;
             TCB[task_id]->Parameter = ((create_task_t*) param)->Parameter;
-            TCB[task_id]->StackSize = ((create_task_t*) param)->StackSize;
+            TCB[task_id]->StackSize = ((create_task_t*) param)->StackSize;         
             TCB[task_id]->SP=malloc(((create_task_t*) param)->StackSize);
             if(TCB[task_id]->SP)
             {
-              InitStack(TCB[task_count]);
-              ((create_task_t*) param)->TaskId=(uint32_t) TCB[task_id];
-              if(!task_id)
+              InitStack(TCB[task_id]);
+              if ( !(((create_task_t*) param)->CreationFlags & CREATE_SUSPENDED) && task_id)
+              {        
+                ReadyTasks|=0x80000000 >> task_id;
+                TCB[task_id]->State=0;
+              }
+              else
+              {
+                TCB[task_id]->State=SUSPEND_TASK;
+              }
+                
+              ((create_task_t*) param)->TaskId=task_id;
+              if(task_id)
                 task_count++;
             }
             else
@@ -590,6 +543,25 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
               ((create_task_t*) param)->TaskId=INVALID_TID;            
           }
         }        
+      break;
+      case 10:
+        mailbox=malloc(sizeof(mailbox_t));
+        if(mailbox)
+        {
+          mailbox->TypeAndOwner=HANDLE_TYPE_MAILBOX;
+          mailbox->maxmsg= ((create_mailbox_t*)param)->maxmsg;
+          mailbox->msgsize= ((create_mailbox_t*)param)->msgsize;
+          mailbox->paket_size=(mailbox->msgsize+3) & 0xFFFFFFFC;
+          mailbox->buffer=malloc(mailbox->maxmsg*mailbox->paket_size);
+          if(mailbox->buffer)
+          {
+            
+          }
+          else
+          {
+            free(mailbox);
+          }
+        }
       break;
     default:while(1);;break;  
   }

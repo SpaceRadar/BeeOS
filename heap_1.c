@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include "heap.h"
 
-#define configTOTAL_HEAP_SIZE 2048
+#define configTOTAL_HEAP_SIZE 4096
 //#define portBYTE_ALIGNMENT_MASK 0x00000003
 //#define portBYTE_ALIGNMENT 4
 

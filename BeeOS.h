@@ -19,7 +19,7 @@
 
 #define HANDLE_TYPE_MUTEX     0x20000000
 #define HANDLE_TYPE_SEMAPHORE 0x40000000
-
+#define HANDLE_TYPE_MAILBOX   0x80000000
 
 #define HANDLE_OWNERLESS           0x00000000
 #define HANDLE_TASK_ID_MASK        0x0000FFFF
@@ -92,6 +92,32 @@ typedef struct
   uint32_t               TaskId;
 }create_task_t;
 
+typedef struct
+{
+  uint32_t size;
+  uint32_t data[];
+}mailbox_packet_t;
+
+
+typedef struct
+{
+  uint32_t  TypeAndOwner;  
+  uint32_t  maxmsg;
+  uint32_t  msgsize;
+  uint32_t  paket_size;
+  void*     buffer;
+  mailbox_packet_t*  read_packet;
+  mailbox_packet_t*  write_packet;  
+}mailbox_t;
+
+typedef struct
+{
+  uint32_t maxmsg;
+  uint32_t msgsize;
+  uint32_t handle; 
+}create_mailbox_t;
+
+
 typedef unsigned long  CRITICAL_SECTION;
 typedef unsigned long* LPCRITICAL_SECTION;
 
@@ -124,17 +150,6 @@ tid_t CreateTask(uint32_t               StackSize,
                  LPTHREAD_START_ROUTINE StartAddress, 
                  void*                  Parameter,
                  uint32_t               CreationFlags);
-
-tid_t CreateTaskPrev(uint32_t               StackSize, 
-                     LPTHREAD_START_ROUTINE StartAddress, 
-                     void*                  Parameter,
-                     uint32_t               CreationFlags);
-
-tid_t CreateIdleTask(uint32_t               StackSize, 
-                     LPTHREAD_START_ROUTINE StartAddress, 
-                     void*                  Parameter,
-                     uint32_t               CreationFlags,
-                     uint32_t               TaskId);
 
 
 #endif

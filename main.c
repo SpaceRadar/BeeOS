@@ -112,22 +112,18 @@ int led=0;
 
 HANDLE hMutex;
 HANDLE hSem1, hSem2;
-void MainTask(void* param)
-{ 
-//  InitializeCriticalSection(&cs);
-//  CreateMutex(&hMutex, 1);
-  hSem1=CreateSemaphore(0, 1);
-  hSem2=CreateSemaphore(0, 1);
-//  Sleep(1000);
-  ResumeTask(2);  
-  ResumeTask(3);
-  ReleaseSemaphore(hSem1,1);
-  Sleep(INFINITE);
-  while(1);
-}
 
 void Task1(void* param)
 { 
+  volatile uint32_t a=0;
+  uint32_t inc=(uint32_t) param;
+  while(1)
+  {
+    a+=inc;
+    Sleep(0);
+  }
+  
+/*  
   while(1)
   {
     WaitForSingleObject(hSem1);  
@@ -135,6 +131,7 @@ void Task1(void* param)
     LEDOn(LED1); 
     ReleaseSemaphore(hSem2,1);    
   }
+*/  
 }
 
 void Task2(void* param)
@@ -169,12 +166,24 @@ unsigned long addr1, addr2;
 
 
 
-/*
-HANDLE CreateThread(SIZE_T dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress)
-{
-  
+void MainTask(void* param)
+{ 
+//  InitializeCriticalSection(&cs);
+//  CreateMutex(&hMutex, 1);
+  uint32_t tid1,tid2;
+  tid1=CreateTask(1024,Task1,(void*)1,0);
+  tid2=CreateTask(1024,Task1,(void*)2,0);
+
+  hSem1=CreateSemaphore(0, 1);
+  hSem2=CreateSemaphore(0, 1);
+//  Sleep(1000);
+  ResumeTask(tid1);  
+//  ResumeTask(tid2);
+  ReleaseSemaphore(hSem1,1);
+  Sleep(INFINITE);
+  while(1);
 }
-*/
+
 void Test()
 {
   //unsigned long val=0;
@@ -229,6 +238,7 @@ void main()
   LEDInit(LED1);
   __enable_interrupt();
   SysTick_Config(SystemCoreClock/1000);
-  CreateTaskPrev(64,MainTask,0,0);
+  CreateMailBox(10,10);
+  CreateTask(64,MainTask,0,0);
   StartFirstTask();
 }
