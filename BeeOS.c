@@ -44,35 +44,6 @@ void BeyondTheTask(void)
        );  
 }
 
-int InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
-{
-  __asm( 
-        "     isb      \n"          
-        "     svc   3  \n"
-       );
-  if (0xFFFFFFFF==*lpCriticalSection)
-    return -1;
-  else
-    return 0; 
-}
-
-int EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
-{
-  __asm( 
-        "     isb      \n"          
-        "     svc   4  \n"
-       );    
-  return 0; 
-}
-
-int LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
-{
-  __asm( 
-        "     isb      \n"          
-        "     svc   5  \n"
-       );    
-  return 0; 
-}
 
 void ResumeTask (tid_t tid)
 {
@@ -82,7 +53,7 @@ void ResumeTask (tid_t tid)
        );    
 }
 
-void WaitForSingleObject (HANDLE handle)
+void WaitForSingleObjectAdapter (wait_for_single_object_t* wait_for_single_object)
 {
   __asm( 
         "     isb      \n"          
@@ -148,6 +119,15 @@ void* AllocateMem(uint32_t size)
        );    
 }
 #pragma diag_default=Pe940
+
+int32_t WaitForSingleObject (HANDLE handle, uint32_t time_out)
+{
+  wait_for_single_object_t wait_for_single_object;
+  wait_for_single_object.handle=handle;
+  wait_for_single_object.time_out=time_out;
+  WaitForSingleObjectAdapter(&wait_for_single_object);
+  return wait_for_single_object.result;
+}
 
 
 HANDLE CreateMutex(uint32_t InitialOwner)
@@ -486,25 +466,37 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       break;
     case 7: 
       //WaiteForSingleObject
-      if(param)
+      switch(  *((uint32_t*)((wait_for_single_object_t*) param)->handle) & HANDLE_TYPE_MASK )
       {  
-        switch( *((uint32_t*) param) & HANDLE_TYPE_MASK )
-        {  
         case HANDLE_TYPE_SEMAPHORE:
-          if( ((semaphore_t*) param)->semaphore_count)
+          if( ((semaphore_t*)((wait_for_single_object_t*) param)->handle)->semaphore_count )
           {
-            --((semaphore_t*) param)->semaphore_count;
-            result=0x00000000;               
+            --((semaphore_t*)((wait_for_single_object_t*) param)->handle)->semaphore_count;
+            ((wait_for_single_object_t*) param)->result=E_OK;            
+            result=0x00000000;   
           }
           else
           {
-            current_task->State=WAITING_HANDLE;
-            ReadyTasksCurrent&=~(0x80000000>>current_task_id);
-            ReadyTasks&=~(0x80000000>>current_task_id);  
-            ((semaphore_t*) param)->waiting_tasks|=(0x80000000>>current_task_id);
-            result=0xFFFFFFFF;              
+            if( ((wait_for_single_object_t*) param)->time_out )
+            {
+              if( INFINITE==((wait_for_single_object_t*) param)->time_out )
+              {
+                current_task->State=WAITING_HANDLE | SUSPEND_TASK;   
+              }
+              else
+              {
+                current_task->State=WAITING_HANDLE | SLEEP_TASK;
+                SleepTasks|=0x80000000>>current_task_id;  
+              }
+              ReadyTasksCurrent&=~(0x80000000>>current_task_id);
+              ReadyTasks&=~(0x80000000>>current_task_id);  
+              ((semaphore_t*) param)->waiting_tasks|=(0x80000000>>current_task_id);
+              current_task->RequestStruct=(void*)param;
+              result=0xFFFFFFFF;              
+            }
+            ((wait_for_single_object_t*) param)->result=E_TIME_OUT;
           }
-          break;
+        break;
         case HANDLE_TYPE_MUTEX:
           if( ((*((uint32_t*) param)  & HANDLE_TASK_ID_MASK) == HANDLE_OWNERLESS) || ((*((uint32_t*) param)  & HANDLE_TASK_ID_MASK) == current_task_id) )
           {
@@ -520,7 +512,6 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
             result=0xFFFFFFFF;              
           }
           break;
-        }
       }
     break;  
     case 8: 
@@ -645,16 +636,20 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
         ((create_mailbox_t*)param)->handle=(uint32_t)mailbox;
       break;
       case 11:
-      //SendMessage  
+      //SendMessage 
       if(  ((send_message_t*)param)->handle &&  (*((uint32_t*) ((send_message_t*)param)->handle)==HANDLE_TYPE_MAILBOX) )
       {
         if( ((send_message_t*)param)->size<= ((mailbox_t*)((send_message_t*)param)->handle)->msgsize )
         {   
-          task_id=__CLZ(((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks & ~SleepTasks);
-          if(task_id<32)
-          {
+          task_id=__CLZ(((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks & ~SleepTasks) & 0x0000001F;
+          if(task_id)
+          {            
             //same task is waiting this message 
-            if( ((get_message_t*)TCB[task_id]->RequestStruct)->size<= ((get_message_t*)param)->size ) 
+            ((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks&=~(0x80000000>>task_id);    
+            ReadyTasksCurrent|=(0x80000000>>task_id);
+            ReadyTasks|=(0x80000000>>task_id); 
+            TCB[task_id]->State&=~WAITING_HANDLE;            
+            if( ((get_message_t*)TCB[task_id]->RequestStruct)->size>= ((get_message_t*)param)->size ) 
             {                        
                 memcpy( ((get_message_t*)TCB[task_id]->RequestStruct)->buffer,
                         ((send_message_t*)param)->buffer,
@@ -665,14 +660,11 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
             else
             {
                 //buffer too small
-                ((get_message_t*)TCB[task_id]->RequestStruct)->result=((send_message_t*)param)->size;              
+                ((get_message_t*)TCB[task_id]->RequestStruct)->result=E_BUFFER_TOO_SMALL;              
+                task_id=0;
             }            
-            ((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks&=~(0x80000000>>task_id);    
-            ReadyTasksCurrent|=(0x80000000>>task_id);
-            ReadyTasks|=(0x80000000>>task_id); 
-            TCB[task_id]->State&=~WAITING_HANDLE;
           } 
-          else
+          if(!task_id)
           {
             //No one task is waiting this message 
             if( ((mailbox_t*)((send_message_t*)param)->handle)->counter< ((mailbox_t*)((send_message_t*)param)->handle)->maxmsg )
@@ -697,18 +689,18 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
             }            
           }
           //All OK
-          ((send_message_t*) param)->result=0;
+          ((send_message_t*) param)->result=E_OK;
         }
         else
         {
           //Too long message
-          ((send_message_t*) param)->result=-1;          
+          ((send_message_t*) param)->result=E_BUFFER_TOO_SMALL;          
         }
       }
       else
       {
         //Invalid or not a MailBox handle
-        ((send_message_t*) param)->result=-1;
+        ((send_message_t*) param)->result=E_INVALID_HANDLE;
       }
       break;
       case 12:
@@ -746,7 +738,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
            else
            {
              //output buffer is too small
-             ((get_message_t*) param)->result=-1;
+             ((get_message_t*) param)->result=E_BUFFER_TOO_SMALL;
            }           
          }
          else
@@ -763,7 +755,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       else
       {
         //Invalid or not a MailBox handle
-        ((get_message_t*) param)->result=-1;
+        ((get_message_t*) param)->result=E_INVALID_HANDLE;
       }
       break;
 

@@ -16,7 +16,7 @@ TypeViolation=1
 UnspecRange=1
 ActionState=1
 [DebugChecksum]
-Checksum=1071255153
+Checksum=-872756791
 [Exceptions]
 StopOnUncaught=_ 0
 StopOnThrow=_ 0
@@ -90,7 +90,6 @@ Enabled=_ 0
 Fmt0=TCB_t-SleepParam	4	0
 Fmt1=TCB_t-StackSize	4	0
 Fmt2=TCB_t-State	4	0
-Fmt3=struct <Unnamed 6>-write_waiting_tasks	4	0
 [array_types]
 Fmt0=uint32_t[10]	4	0
 Fmt1=unsigned long[64]	4	0
@@ -115,16 +114,16 @@ ShowTimeSum=1
 [Disassemble mode]
 mode=0
 [Breakpoints2]
-Bp0=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.289.3" 0 0 1 "" 0 ""
-Bp1=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.773.13" 0 0 1 "" 0 ""
-Bp2=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.259.3" 0 0 1 "" 0 ""
-Bp3=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.186.3" 0 0 1 "" 0 ""
-Bp4=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.124.3" 0 0 1 "" 0 ""
-Bp5=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.125.3" 0 0 1 "" 0 ""
-Bp6=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.192.8" 0 0 1 "" 0 ""
-Bp7=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.263.3" 0 0 1 "" 0 ""
-Bp8=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.259.3" 0 0 1 "" 0 ""
-Bp9=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.194.7" 0 0 1 "" 0 ""
+Bp0=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.269.3" 0 0 1 "" 0 ""
+Bp1=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.261.3" 0 0 1 "" 0 ""
+Bp2=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.263.3" 0 0 1 "" 0 ""
+Bp3=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.261.3" 0 0 1 "" 0 ""
+Bp4=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.259.3" 0 0 1 "" 0 ""
+Bp5=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.259.3" 0 0 1 "" 0 ""
+Bp6=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.199.7" 0 0 1 "" 0 ""
+Bp7=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.765.13" 0 0 1 "" 0 ""
+Bp8=_ 1 "STD_CODE2" "{$PROJ_DIR$\BeeOS.c}.469.7" 0 0 1 "" 0 ""
+Bp9=_ 1 "STD_CODE2" "{$PROJ_DIR$\main.c}.201.3" 0 0 1 "" 0 ""
 Count=10
 [Interrupts]
 Enabled=1

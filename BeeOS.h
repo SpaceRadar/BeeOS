@@ -5,6 +5,13 @@
 
 #define INVALID_TID     0xFFFFFFFF
 
+
+#define E_OK                  (0)
+#define E_INVALID_TID         (-1)
+#define E_INVALID_HANDLE      (-2)
+#define E_BUFFER_TOO_SMALL    (-3)
+#define E_TIME_OUT            (-4)
+
 #define READY_TASK            0x00000000
 #define SLEEP_TASK            0x00010000
 #define WAITING_HANDLE        0x00020000
@@ -100,6 +107,12 @@ typedef struct
   uint32_t data[];
 }mailbox_packet_t;
 
+typedef struct
+{
+  HANDLE   handle;
+  uint32_t time_out;
+  int32_t  result;
+}wait_for_single_object_t;
 
 typedef struct
 {
@@ -161,7 +174,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id);
 //HANDLE GetCurrentThread();
 
 void ResumeTask (tid_t tid);
-void WaitForSingleObject (HANDLE handle);
+int32_t WaitForSingleObject (HANDLE handle, uint32_t time_out);
 
 HANDLE CreateMutex(uint32_t InitialOwner);
 void ReleaseMutex (HANDLE handle);

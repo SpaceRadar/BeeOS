@@ -25,7 +25,7 @@ if not "%~1" == "" goto debugFile
 
 @echo on 
 
-"C:\Program Files (x86)\IAR Systems\Embedded Workbench 7.5\common\bin\cspybat" -f "D:\ArmProj\ST\ST32F407\First\settings\First.Debug.general.xcl" --backend -f "D:\ArmProj\ST\ST32F407\First\settings\First.Debug.driver.xcl" 
+"F:\Program Files (x86)\IAR Systems\Embedded Workbench 7.5\common\bin\cspybat" -f "E:\ARMProj\ST\STM32F407MiniBoard\First\settings\First.Debug.general.xcl" --backend -f "E:\ARMProj\ST\STM32F407MiniBoard\First\settings\First.Debug.driver.xcl" 
 
 @echo off 
 goto end 
@@ -34,7 +34,7 @@ goto end
 
 @echo on 
 
-"C:\Program Files (x86)\IAR Systems\Embedded Workbench 7.5\common\bin\cspybat" -f "D:\ArmProj\ST\ST32F407\First\settings\First.Debug.general.xcl" "--debug_file=%~1" --backend -f "D:\ArmProj\ST\ST32F407\First\settings\First.Debug.driver.xcl" 
+"F:\Program Files (x86)\IAR Systems\Embedded Workbench 7.5\common\bin\cspybat" -f "E:\ARMProj\ST\STM32F407MiniBoard\First\settings\First.Debug.general.xcl" "--debug_file=%~1" --backend -f "E:\ARMProj\ST\STM32F407MiniBoard\First\settings\First.Debug.driver.xcl" 
 
 @echo off 
 :end

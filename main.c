@@ -120,12 +120,12 @@ void Task1(void* param)
   uint32_t inc=(uint32_t) param;
  
   uint32_t buff[4]={0x11111111,0x22222222,0x33333333,0x44444444}; 
-
+/*
   SendMessage(hMsg,4,&buff[0]);
   SendMessage(hMsg,4,&buff[1]);  
   SendMessage(hMsg,4,&buff[2]);   
   SendMessage(hMsg,4,&buff[3]);  
-  
+*/  
 
   while(1)
   {
@@ -148,7 +148,7 @@ void Task2(void* param)
 {
   while(1)
   {
-    WaitForSingleObject(hSem2);
+    WaitForSingleObject(hSem2,2);
     Sleep(500);
     LEDOff(LED1); 
     ReleaseSemaphore(hSem1,1);    
@@ -157,7 +157,7 @@ void Task2(void* param)
 
 void Task3(void* param)
 {
-  WaitForSingleObject(hSem1);
+  WaitForSingleObject(hSem1,2);
 //  Sleep(15);
 //  ReleaseMutex(&hMutex);  
   Sleep(INFINITE);  
@@ -166,7 +166,7 @@ void Task3(void* param)
 
 void Task4(void* param)
 {
-  WaitForSingleObject(hSem1);
+  WaitForSingleObject(hSem1,2);
   Sleep(15);
   Sleep(INFINITE);  
   while(1);    
@@ -182,21 +182,21 @@ void MainTask(void* param)
 //  InitializeCriticalSection(&cs);
 //  CreateMutex(&hMutex, 1);
   uint32_t tid1,tid2,idx;
+  int32_t len;
 
   tid1=CreateTask(1024,Task1,(void*)1,0);
 //  tid2=CreateTask(1024,Task1,(void*)2,0);
-
+/*
   idx=0;
   while(1)
   {
-    if(GetMessage(hMsg,4,&buffout[idx])>0)
-    {
-      idx++;
-    }
+    len=GetMessage(hMsg,1,&buffout[idx]);
+    idx++;
   }
-  
-  hSem1=CreateSemaphore(0, 1);
+*/  
+  hSem1=CreateSemaphore(1, 1);
   hSem2=CreateSemaphore(0, 1);
+  len=WaitForSingleObject(hSem1,0);
 //  Sleep(1000);
   ResumeTask(tid1);  
 //  ResumeTask(tid2);

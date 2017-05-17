@@ -735,7 +735,7 @@
         </option>
         <option>
           <name>IlinkIcfFile</name>
-          <state>D:\ArmProj\Common\ST\icf\stm32f407xG_ram.icf</state>
+          <state>e:\ArmProj\Common\ST\icf\stm32f407xG_ram.icf</state>
         </option>
         <option>
           <name>IlinkIcfFileSlave</name>
