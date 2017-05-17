@@ -111,12 +111,22 @@ int led=0;
 
 
 HANDLE hMutex;
+HANDLE hMsg;
 HANDLE hSem1, hSem2;
 
 void Task1(void* param)
 { 
   volatile uint32_t a=0;
   uint32_t inc=(uint32_t) param;
+ 
+  uint32_t buff[4]={0x11111111,0x22222222,0x33333333,0x44444444}; 
+
+  SendMessage(hMsg,4,&buff[0]);
+  SendMessage(hMsg,4,&buff[1]);  
+  SendMessage(hMsg,4,&buff[2]);   
+  SendMessage(hMsg,4,&buff[3]);  
+  
+
   while(1)
   {
     a+=inc;
@@ -165,15 +175,26 @@ void Task4(void* param)
 unsigned long addr1, addr2;
 
 
-
+uint32_t buffout[10]; 
 void MainTask(void* param)
 { 
+// 
 //  InitializeCriticalSection(&cs);
 //  CreateMutex(&hMutex, 1);
-  uint32_t tid1,tid2;
-  tid1=CreateTask(1024,Task1,(void*)1,0);
-  tid2=CreateTask(1024,Task1,(void*)2,0);
+  uint32_t tid1,tid2,idx;
 
+  tid1=CreateTask(1024,Task1,(void*)1,0);
+//  tid2=CreateTask(1024,Task1,(void*)2,0);
+
+  idx=0;
+  while(1)
+  {
+    if(GetMessage(hMsg,4,&buffout[idx])>0)
+    {
+      idx++;
+    }
+  }
+  
   hSem1=CreateSemaphore(0, 1);
   hSem2=CreateSemaphore(0, 1);
 //  Sleep(1000);
@@ -238,7 +259,7 @@ void main()
   LEDInit(LED1);
   __enable_interrupt();
   SysTick_Config(SystemCoreClock/1000);
-  CreateMailBox(10,10);
-  CreateTask(64,MainTask,0,0);
+  hMsg=CreateMailBox(2,10);
+  CreateTask(256,MainTask,0,0);
   StartFirstTask();
 }

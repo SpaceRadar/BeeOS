@@ -1,6 +1,7 @@
 #include "stm32f4xx.h"
 #include "stm32f4xx_rcc.h"
 #include <core_cm4.h>
+#include <string.h>
 
 #include "BeeOS.h"
 #include "BeeOS_Tasks.h"
@@ -121,6 +122,23 @@ void CreateMailBoxAdapter(create_mailbox_t* create_mailbox)
        );   
 }
 
+void SendMessageAdapter(send_message_t* send_message)
+{
+  __asm( 
+        "     isb      \n"          
+        "     svc   11  \n"
+       );   
+}
+
+void GetMessageAdapter(get_message_t* get_message)
+{
+  __asm( 
+        "     isb      \n"          
+        "     svc   12  \n"
+       );   
+}
+
+
 #pragma diag_suppress=Pe940 
 void* AllocateMem(uint32_t size)
 {
@@ -163,6 +181,7 @@ HANDLE CreateMailBox(uint32_t maxmsg, uint32_t msgsize)
 {
   create_mailbox_t create_mailbox;
   create_mailbox.maxmsg=maxmsg;
+  create_mailbox.msgsize=msgsize;
   
   if(beeos_running)
     CreateMailBoxAdapter(&create_mailbox);  
@@ -190,9 +209,31 @@ tid_t CreateTask(uint32_t               StackSize,
   return create_task.TaskId;
 }
 
+int32_t SendMessage(HANDLE handle,uint32_t size, void* buffer)
+{
+  send_message_t send_message;
+  send_message.handle=handle;
+  send_message.buffer=buffer;
+  send_message.size=size;
+  SendMessageAdapter(&send_message);
+  return send_message.result;
+}
+
+int32_t GetMessage(HANDLE handle,uint32_t size, void* buffer)
+{
+  get_message_t get_message;
+  get_message.handle=handle;
+  get_message.buffer=buffer;
+  get_message.size=size;
+  GetMessageAdapter(&get_message);
+  return get_message.result;
+}
+
+
 void InitStack(TCB_t* TCB)
 {
-  uint32_t* SP=&TCB->SP[STACK_SIZE>>2];
+  uint32_t* SP;
+  SP=(uint32_t*) ((uint32_t)TCB->Stack+TCB->StackSize);
 #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)  
   *(--SP)= 0x00000000;
   *(--SP)= 0x02000000;  //FPSCR
@@ -358,6 +399,40 @@ void* coreAllocateMem(uint32_t size)
   return malloc(size);
 }
 
+void inc_mailbox_write_pointer(mailbox_t* mailbox)  
+{
+  ++mailbox->write_idx;   
+  if( mailbox->write_idx < mailbox->maxmsg)
+  {    
+    //move write pointer on one step
+    mailbox->write_packet= (mailbox_packet_t*)((uint32_t) mailbox->write_packet + mailbox->paket_size);               
+  }
+  else
+  {
+    //move write pointer to first position              
+    mailbox->write_packet=mailbox->buffer;
+    mailbox->write_idx=0;              
+  }    
+  ++mailbox->counter;  
+}
+        
+void inc_mailbox_read_pointer(mailbox_t* mailbox)  
+{
+  ++mailbox->read_idx;   
+  if( mailbox->read_idx < mailbox->maxmsg)
+  {    
+    //move write pointer on one step
+    mailbox->read_packet= (mailbox_packet_t*)((uint32_t) mailbox->read_packet + mailbox->paket_size);               
+  }
+  else
+  {
+    //move write pointer to first position              
+    mailbox->read_packet=mailbox->buffer;
+    mailbox->read_idx=0;              
+  } 
+  --mailbox->counter;
+}
+        
 
 
 static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
@@ -514,8 +589,8 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
             TCB[task_id]->StartAddress = ((create_task_t*) param)->StartAddress;
             TCB[task_id]->Parameter = ((create_task_t*) param)->Parameter;
             TCB[task_id]->StackSize = ((create_task_t*) param)->StackSize;         
-            TCB[task_id]->SP=malloc(((create_task_t*) param)->StackSize);
-            if(TCB[task_id]->SP)
+            TCB[task_id]->Stack=malloc(((create_task_t*) param)->StackSize);
+            if(TCB[task_id]->Stack)
             {
               InitStack(TCB[task_id]);
               if ( !(((create_task_t*) param)->CreationFlags & CREATE_SUSPENDED) && task_id)
@@ -551,18 +626,150 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           mailbox->TypeAndOwner=HANDLE_TYPE_MAILBOX;
           mailbox->maxmsg= ((create_mailbox_t*)param)->maxmsg;
           mailbox->msgsize= ((create_mailbox_t*)param)->msgsize;
-          mailbox->paket_size=(mailbox->msgsize+3) & 0xFFFFFFFC;
+          mailbox->paket_size=(mailbox->msgsize+7) & 0xFFFFFFFC;
           mailbox->buffer=malloc(mailbox->maxmsg*mailbox->paket_size);
           if(mailbox->buffer)
           {
-            
+            mailbox->read_idx=0;
+            mailbox->write_idx=0;
+            mailbox->counter=0; 
+            mailbox->read_packet=mailbox->buffer;
+            mailbox->write_packet=mailbox->buffer;            
           }
           else
           {
             free(mailbox);
+            mailbox=0;
           }
         }
+        ((create_mailbox_t*)param)->handle=(uint32_t)mailbox;
       break;
+      case 11:
+      //SendMessage  
+      if(  ((send_message_t*)param)->handle &&  (*((uint32_t*) ((send_message_t*)param)->handle)==HANDLE_TYPE_MAILBOX) )
+      {
+        if( ((send_message_t*)param)->size<= ((mailbox_t*)((send_message_t*)param)->handle)->msgsize )
+        {   
+          task_id=__CLZ(((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks & ~SleepTasks);
+          if(task_id<32)
+          {
+            //same task is waiting this message 
+            if( ((get_message_t*)TCB[task_id]->RequestStruct)->size<= ((get_message_t*)param)->size ) 
+            {                        
+                memcpy( ((get_message_t*)TCB[task_id]->RequestStruct)->buffer,
+                        ((send_message_t*)param)->buffer,
+                        ((send_message_t*)param)->size
+                      );             
+                ((get_message_t*)TCB[task_id]->RequestStruct)->result=((send_message_t*)param)->size;
+            }
+            else
+            {
+                //buffer too small
+                ((get_message_t*)TCB[task_id]->RequestStruct)->result=((send_message_t*)param)->size;              
+            }            
+            ((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks&=~(0x80000000>>task_id);    
+            ReadyTasksCurrent|=(0x80000000>>task_id);
+            ReadyTasks|=(0x80000000>>task_id); 
+            TCB[task_id]->State&=~WAITING_HANDLE;
+          } 
+          else
+          {
+            //No one task is waiting this message 
+            if( ((mailbox_t*)((send_message_t*)param)->handle)->counter< ((mailbox_t*)((send_message_t*)param)->handle)->maxmsg )
+            {
+              //There is a room for this message
+              ((mailbox_t*)((send_message_t*)param)->handle)->write_packet->size=((send_message_t*)param)->size;
+              memcpy( ((mailbox_t*)((send_message_t*)param)->handle)->write_packet->data,
+                      ((send_message_t*)param)->buffer,
+                      ((send_message_t*)param)->size); 
+
+              inc_mailbox_write_pointer( (mailbox_t*)((send_message_t*)param)->handle);                
+            }
+            else
+            {
+              //Mailbox is full. Send to sleep the task
+              current_task->State=WAITING_HANDLE;
+              current_task->RequestStruct=(void*) param;
+              ReadyTasksCurrent&=~(0x80000000>>current_task_id);
+              ReadyTasks&=~(0x80000000>>current_task_id);              
+              ((mailbox_t*)((send_message_t*)param)->handle)->write_waiting_tasks|=(0x80000000>>current_task_id);
+              result=0xFFFFFFFF;               
+            }            
+          }
+          //All OK
+          ((send_message_t*) param)->result=0;
+        }
+        else
+        {
+          //Too long message
+          ((send_message_t*) param)->result=-1;          
+        }
+      }
+      else
+      {
+        //Invalid or not a MailBox handle
+        ((send_message_t*) param)->result=-1;
+      }
+      break;
+      case 12:
+      //GetMessage  
+      if(  ((get_message_t*)param)->handle &&  (*((uint32_t*) ((get_message_t*)param)->handle)==HANDLE_TYPE_MAILBOX) )
+      {
+         if(((mailbox_t*)((get_message_t*)param)->handle)->counter)
+         {
+           if( ((mailbox_t*)((get_message_t*)param)->handle)->read_packet->size <= ((get_message_t*)param)->size)
+           {
+             
+              memcpy(((get_message_t*)param)->buffer, 
+                     ((mailbox_t*)((get_message_t*)param)->handle)->read_packet->data,                   
+                     ((mailbox_t*)((get_message_t*)param)->handle)->read_packet->size); 
+
+              ((get_message_t*) param)->result=((mailbox_t*)((get_message_t*)param)->handle)->read_packet->size;
+             
+              inc_mailbox_read_pointer( (mailbox_t*)((get_message_t*)param)->handle);                
+               
+              task_id=__CLZ(((mailbox_t*)((get_message_t*)param)->handle)->write_waiting_tasks & ~SleepTasks);
+              if(task_id<32)
+              {
+                ((mailbox_t*)((get_message_t*)param)->handle)->write_packet->size=((send_message_t*)TCB[task_id]->RequestStruct)->size;
+                memcpy( ((mailbox_t*)((send_message_t*)param)->handle)->write_packet->data,
+                        ((send_message_t*)TCB[task_id]->RequestStruct)->buffer,
+                        ((send_message_t*)TCB[task_id]->RequestStruct)->size); 
+
+                inc_mailbox_write_pointer( (mailbox_t*)((get_message_t*)param)->handle);                 
+                ((mailbox_t*)((get_message_t*)param)->handle)->write_waiting_tasks&=~(0x80000000>>task_id);    
+                ReadyTasksCurrent|=(0x80000000>>task_id);
+                ReadyTasks|=(0x80000000>>task_id); 
+                TCB[task_id]->State&=~WAITING_HANDLE;
+              }                
+           }
+           else
+           {
+             //output buffer is too small
+             ((get_message_t*) param)->result=-1;
+           }           
+         }
+         else
+         {
+           //Empty box. Send to sleep the task
+            current_task->State=WAITING_HANDLE;
+            current_task->RequestStruct=(void*)param;
+            ReadyTasksCurrent&=~(0x80000000>>current_task_id);
+            ReadyTasks&=~(0x80000000>>current_task_id);              
+            ((mailbox_t*)((get_message_t*)param)->handle)->read_waiting_tasks|=(0x80000000>>current_task_id);
+            result=0xFFFFFFFF;            
+         }
+      }
+      else
+      {
+        //Invalid or not a MailBox handle
+        ((get_message_t*) param)->result=-1;
+      }
+      break;
+
+
+
+      
     default:while(1);;break;  
   }
   return result;

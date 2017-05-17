@@ -1,7 +1,6 @@
 #ifndef BEEOS_H
 #define BEEOS_H
 
-#define STACK_SIZE      64
 #define MAX_TASK_COUNT  32
 
 #define INVALID_TID     0xFFFFFFFF
@@ -50,14 +49,17 @@
 typedef void (*LPTHREAD_START_ROUTINE) (void*);
 typedef uint32_t tid_t;
 typedef uint32_t HANDLE;
+typedef uint32_t task_set_t;
 typedef struct
 {
   uint32_t* SP;
-  uint32_t State;
+  uint32_t  State;
+  uint32_t* Stack;
   LPTHREAD_START_ROUTINE StartAddress;
   unsigned long StackSize;
-  void* Parameter;
-  uint32_t SleepParam; 
+  void*    Parameter;
+  uint32_t SleepParam;
+  void*    RequestStruct;
 } TCB_t;
 
 typedef struct
@@ -71,16 +73,16 @@ typedef struct
 
 typedef struct
 {
-  uint32_t TypeAndOwner;
-  uint32_t waiting_tasks; 
+  uint32_t   TypeAndOwner;
+  task_set_t waiting_tasks; 
 }mutex_t;
 
 typedef struct
 {
-  uint32_t TypeAndOwner;
-  uint32_t waiting_tasks; 
-  uint32_t semaphore_count;
-  uint32_t semaphore_max_count;
+  uint32_t   TypeAndOwner;
+  task_set_t waiting_tasks; 
+  uint32_t   semaphore_count;
+  uint32_t   semaphore_max_count;
 }semaphore_t;
 
 typedef struct
@@ -106,6 +108,11 @@ typedef struct
   uint32_t  msgsize;
   uint32_t  paket_size;
   void*     buffer;
+  uint32_t  read_idx;
+  uint32_t  write_idx;
+  uint32_t  counter;
+  task_set_t read_waiting_tasks;
+  task_set_t write_waiting_tasks;   
   mailbox_packet_t*  read_packet;
   mailbox_packet_t*  write_packet;  
 }mailbox_t;
@@ -114,8 +121,24 @@ typedef struct
 {
   uint32_t maxmsg;
   uint32_t msgsize;
-  uint32_t handle; 
+  HANDLE   handle; 
 }create_mailbox_t;
+
+typedef struct
+{
+  HANDLE   handle;
+  uint32_t size;
+  void*    buffer;
+  int32_t  result;
+} send_message_t;
+
+typedef struct
+{
+  HANDLE   handle;
+  uint32_t size;
+  void*    buffer;
+  int32_t  result;
+} get_message_t;
 
 
 typedef unsigned long  CRITICAL_SECTION;
@@ -146,10 +169,16 @@ void ReleaseMutex (HANDLE handle);
 HANDLE CreateSemaphore (uint32_t InitialCount, uint32_t MaximumCount);
 void ReleaseSemaphore (HANDLE handle, uint32_t ReleaseCount);
 
+HANDLE CreateMailBox(uint32_t maxmsg, uint32_t msgsize);
+int32_t SendMessage(HANDLE handle,uint32_t size, void* buffer);
+int32_t GetMessage(HANDLE handle,uint32_t size, void* buffer);
+
 tid_t CreateTask(uint32_t               StackSize, 
                  LPTHREAD_START_ROUTINE StartAddress, 
                  void*                  Parameter,
                  uint32_t               CreationFlags);
+
+
 
 
 #endif
