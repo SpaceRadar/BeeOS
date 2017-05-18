@@ -7,10 +7,13 @@
 
 
 #define E_OK                  (0)
-#define E_INVALID_TID         (-1)
-#define E_INVALID_HANDLE      (-2)
+#define E_INVALID_HANDLE      (-1)
+#define E_INVALID_TID         (-2)
 #define E_BUFFER_TOO_SMALL    (-3)
 #define E_TIME_OUT            (-4)
+#define E_INVALID_VALUE       (-5)
+
+#define INVALID_HANDLE         ((uint32_t) E_INVALID_HANDLE)
 
 #define READY_TASK            0x00000000
 #define SLEEP_TASK            0x00010000
@@ -78,19 +81,33 @@ typedef struct
   unsigned long TopWaitPriority;    
 }CRITICAL_SECTION_t;
 
-typedef struct
-{
-  uint32_t   TypeAndOwner;
-  task_set_t waiting_tasks; 
-}mutex_t;
 
 typedef struct
 {
   uint32_t   TypeAndOwner;
   task_set_t waiting_tasks; 
+}handle_base_t;
+
+
+typedef struct
+{
+  handle_base_t base;
+}mutex_t;
+
+typedef struct
+{
+  handle_base_t base; 
   uint32_t   semaphore_count;
   uint32_t   semaphore_max_count;
 }semaphore_t;
+
+typedef struct
+{
+  HANDLE   handle; 
+  uint32_t handle_type;
+  uint32_t release_count;
+  int32_t  result;
+}release_object_t;
 
 typedef struct
 {
@@ -177,10 +194,10 @@ void ResumeTask (tid_t tid);
 int32_t WaitForSingleObject (HANDLE handle, uint32_t time_out);
 
 HANDLE CreateMutex(uint32_t InitialOwner);
-void ReleaseMutex (HANDLE handle);
+int32_t ReleaseMutex (HANDLE handle);
 
 HANDLE CreateSemaphore (uint32_t InitialCount, uint32_t MaximumCount);
-void ReleaseSemaphore (HANDLE handle, uint32_t ReleaseCount);
+int32_t ReleaseSemaphore (HANDLE handle, uint32_t ReleaseCount);
 
 HANDLE CreateMailBox(uint32_t maxmsg, uint32_t msgsize);
 int32_t SendMessage(HANDLE handle,uint32_t size, void* buffer);
