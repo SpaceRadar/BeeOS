@@ -1,6 +1,5 @@
 #include "stm32f4xx.h"
-//#include "stm32f4xx_rcc.h"
-#include <core_cm4.h>
+//#include <core_cm4.h>
 #include <string.h>
 
 #include "BeeOS.h"
@@ -13,6 +12,7 @@ static volatile task_set_t ReadyTasksCurrent=0;
 static volatile task_set_t ReadyTasks=0;
 static volatile task_set_t SleepTasks=0;
 static volatile task_set_t ActiveTasks=0;
+static volatile task_set_t ExistTasks=0;
 
 
 static volatile TCB_t* current_task;
@@ -21,6 +21,27 @@ static volatile uint32_t current_task_id;
 static volatile uint32_t beeos_running=0;
 
 static volatile unsigned long addr;
+
+#define TASK_MASK(tid)        (0x80000000>>(tid))
+
+#define SET_READY_TASK(task_mask) ReadyTasks|=(task_mask)
+#define CLEAR_READY_TASK(task_mask) ReadyTasks&=(~(task_mask))
+
+#define SET_READY_TASK_CURRENT(task_mask) ReadyTasksCurrent|=(task_mask)
+#define CLEAR_READY_TASK_CURRENT(task_mask) ReadyTasksCurrent&=(~(task_mask))
+
+#define SET_SLEEP_TASK(task_mask) SleepTasks|=(task_mask)
+#define CLEAR_SLEEP_TASK(task_mask) SleepTasks&=(~(task_mask))
+
+#define SET_ACTIVE_TASK(task_mask) ActiveTasks|=(task_mask)
+#define CLEAR_ACTIVE_TASK(task_mask) ActiveTasks&=(~(task_mask))
+
+#define SET_EXIST_TASK(task_mask) ExistTasks|=(task_mask)
+#define CLEAR_EXIST_TASK(task_mask) ExistTasks&=(~(task_mask))
+
+#define SET_WAITING_TASK(handler, task_mask)  (handler)|=(task_mask)
+#define CLEAR_WAITING_TASK(handler, task_mask)(handler)&=~(task_mask)
+
 
 __weak void IdleTask(void* param)
 {
@@ -345,25 +366,36 @@ void PendSV_Handler(void)
 
 void coreSheduler(unsigned long bSysTymer)
 {
-  unsigned long SleepTasksTemp;
-  unsigned long idx;
+  task_set_t SleepTasksTemp;
+  task_set_t task_mask;
+  uint32_t task_id;
   
   SleepTasksTemp=SleepTasks;
   while(bSysTymer && SleepTasksTemp)
   {
-    idx=__CLZ(SleepTasksTemp);
-    SleepTasksTemp^=(0x80000000>>idx); 
-    TCB[idx]->SleepParam--;
-    if(!TCB[idx]->SleepParam)
+    task_id=__CLZ(SleepTasksTemp);
+    task_mask=TASK_MASK(task_id);
+
+    SleepTasksTemp^=task_mask; 
+    TCB[task_id]->SleepParam--;
+    if(!TCB[task_id]->SleepParam)
     {
-      SleepTasks^=(0x80000000>>idx); 
-      ReadyTasks|=(0x80000000>>idx);            
-      ReadyTasksCurrent|=(0x80000000>>idx); 
-      TCB[idx]->State&= ~(SLEEP_TASK | WAITING_HANDLE);
+      CLEAR_SLEEP_TASK(task_mask);
+      SET_READY_TASK(task_mask);
+      SET_READY_TASK_CURRENT(task_mask);
+      if(TCB[task_id]->State & WAITING_HANDLE)
+      {
+        TCB[task_id]->State&= ~(SLEEP_TASK | WAITING_HANDLE);       
+        CLEAR_WAITING_TASK(((handle_base_t*)((wait_for_single_object_t*)TCB[task_id]->RequestStruct)->handle)->waiting_tasks, task_mask);
+      }
+      else
+      {  
+        TCB[task_id]->State&= ~SLEEP_TASK;
+      }
     }     
   }
   
-  if(0==(ReadyTasks | ReadyTasksCurrent))
+  if(!ReadyTasks)
   {
     current_task=TCB[IDLE_TASK_ID];          
   }
@@ -374,7 +406,8 @@ void coreSheduler(unsigned long bSysTymer)
       ReadyTasksCurrent=ReadyTasks;
     }
     current_task_id=__CLZ(ReadyTasksCurrent);
-    ReadyTasksCurrent^=(0x80000000>>current_task_id); 
+    task_mask=TASK_MASK(current_task_id);
+    CLEAR_READY_TASK_CURRENT(task_mask); 
     current_task=TCB[current_task_id];        
     }   
 }
@@ -458,8 +491,23 @@ void inc_mailbox_read_pointer(mailbox_t* mailbox)
   --mailbox->counter;
 }
 
-void check_waiting_handle_tasks(release_object_t* release_object)
+uint32_t wakeup_waiting_handle_task(release_object_t* release_object)
 {
+  uint32_t task_id;
+  task_set_t task_mask;
+  task_id=__CLZ( ((handle_base_t*)release_object->handle)->waiting_tasks & ActiveTasks) & 0x0000001F;
+  if(task_id)
+  {                
+    //same task is waiting this handle   
+    task_mask=TASK_MASK(task_id);
+    CLEAR_WAITING_TASK( ((handle_base_t*)release_object->handle)->waiting_tasks,task_mask); 
+    SET_READY_TASK_CURRENT(task_mask);
+    SET_READY_TASK(task_mask);
+    TCB[task_id]->State&=~(WAITING_HANDLE | SLEEP_TASK);  
+    ((wait_for_single_object_t*)TCB[task_id]->RequestStruct)->result=E_OK;
+  }
+  return task_id;
+  
   
 }
         
@@ -467,20 +515,20 @@ void check_waiting_handle_tasks(release_object_t* release_object)
 
 static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
 {
-//  uint32_t idx;
-//  uint32_t cs_idx;
-//  uint32_t WakingTask;
   uint32_t task_id;
   uint32_t result=0; 
   mailbox_t* mailbox;
+  task_set_t current_task_mask;
+  task_set_t task_mask;
   
+  current_task_mask=TASK_MASK(current_task_id);
   switch(svc_id)
   {
-    //Sleep
     case 1:
+      //Sleep
       if(param)
-      {  
-        ReadyTasks&=~(0x80000000>>current_task_id);          
+      {      
+        CLEAR_READY_TASK(current_task_mask);
         if(INFINITE==param)
         {
           current_task->State|=SUSPEND_TASK;
@@ -489,17 +537,19 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
         {          
           current_task->State|=SLEEP_TASK;          
           current_task->SleepParam=param;
-          SleepTasks|=0x80000000>>current_task_id;     
+          SET_SLEEP_TASK(current_task_mask);     
         }
       }  
-      ReadyTasksCurrent&=~(0x80000000>>current_task_id);
+      CLEAR_READY_TASK_CURRENT(current_task_mask);
       result=0xFFFFFFFF; 
       break;
     case 2:
       current_task->State=ZOMBIE_TASK;
-//      SleepTasks|=0x80000000>>current_task_id; 
-      ReadyTasksCurrent&=~(0x80000000>>current_task_id);
-      ReadyTasks&=~(0x80000000>>current_task_id);      
+      CLEAR_READY_TASK_CURRENT(current_task_mask);
+      CLEAR_READY_TASK(current_task_mask);  
+      CLEAR_EXIST_TASK(current_task_mask);
+      free(TCB[current_task_id]->SP);
+      TCB[current_task_id]->SP=(void*)NULL;
       result=0xFFFFFFFF;       
       break;     
     case 6:
@@ -507,12 +557,13 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       {
         TCB[param]->SleepParam=0;      
       }  
-      TCB[param]->State&=~(SLEEP_TASK | SUSPEND_TASK);      
-      SleepTasks&=~(0x80000000>>param); 
+      TCB[param]->State&=~(SLEEP_TASK | SUSPEND_TASK); 
+      task_mask=TASK_MASK(param);
+      CLEAR_SLEEP_TASK(task_mask); 
       if(READY_TASK==TCB[param]->State);
       {
-        ReadyTasks|=(0x80000000>>param);      
-        ReadyTasksCurrent|=(0x80000000>>param);           
+        SET_READY_TASK_CURRENT(task_mask);
+        SET_READY_TASK(task_mask);            
       }  
       break;
     case 7: 
@@ -553,11 +604,12 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           else
           {
             current_task->State=WAITING_HANDLE | SLEEP_TASK;
-            SleepTasks|=0x80000000>>current_task_id;  
+            SET_SLEEP_TASK(current_task_mask);  
           }
-          ReadyTasksCurrent&=~(0x80000000>>current_task_id);
-          ReadyTasks&=~(0x80000000>>current_task_id);
-          current_task->RequestStruct=(void*)param;
+          CLEAR_READY_TASK_CURRENT(current_task_mask);
+          CLEAR_READY_TASK(current_task_mask);  
+          SET_WAITING_TASK(((handle_base_t*)((wait_for_single_object_t*) param)->handle)->waiting_tasks,current_task_mask);
+          current_task->RequestStruct=(void*)param;          
           result=0xFFFFFFFF;              
         }
       }
@@ -576,18 +628,11 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
               ((semaphore_t*)((release_object_t*) param)->handle)->semaphore_count+=((release_object_t*) param)->release_count;
               ((release_object_t*) param)->result=E_OK;              
                 
-              if(((semaphore_t*)((release_object_t*) param)->handle)->semaphore_count)
+              if(  (((semaphore_t*)((release_object_t*) param)->handle)->semaphore_count) &&
+                   wakeup_waiting_handle_task( (release_object_t*) param)
+                )    
               {
-                task_id=__CLZ(((semaphore_t*)((release_object_t*) param)->handle)->base.waiting_tasks & ActiveTasks);
-                if(task_id<32)
-                {
-                  ((semaphore_t*)((release_object_t*) param)->handle)->base.waiting_tasks&=~(0x80000000>>task_id);    
-                  ReadyTasksCurrent|=(0x80000000>>task_id);
-                  ReadyTasks|=(0x80000000>>task_id);  
-                  ((wait_for_single_object_t*)TCB[task_id]->RequestStruct)->result=E_OK;
-                  TCB[task_id]->State&=~(WAITING_HANDLE | SLEEP_TASK);
                   --((semaphore_t*)((release_object_t*) param)->handle)->semaphore_count;
-                }
               }                
             }
             else
@@ -607,22 +652,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           {
             if( (*((uint32_t*)((release_object_t*) param)->handle) & HANDLE_TASK_ID_MASK) == current_task_id)
             {              
-              task_id=__CLZ(((mutex_t*)((release_object_t*) param)->handle)->base.waiting_tasks & ActiveTasks) & 0x0000001F;
-              if(task_id)
-              {
-                *((uint32_t*)((release_object_t*) param)->handle)=HANDLE_TYPE_MUTEX | task_id;
-                  
-                  ((mutex_t*)((release_object_t*) param)->handle)->base.waiting_tasks&=~(0x80000000>>task_id);    
-                  ReadyTasksCurrent|=(0x80000000>>task_id);
-                  ReadyTasks|=(0x80000000>>task_id);  
-                  ((wait_for_single_object_t*)TCB[task_id]->RequestStruct)->result=E_OK;
-                  TCB[task_id]->State&=~(WAITING_HANDLE | SLEEP_TASK);
-              }                
-              else
-              {
-                *((uint32_t*)((release_object_t*) param)->handle)=HANDLE_TYPE_MUTEX | HANDLE_OWNERLESS;                
-              }
-              ((release_object_t*) param)->result=E_OK;              
+                *((uint32_t*)((release_object_t*) param)->handle)= wakeup_waiting_handle_task( (release_object_t*) param) | HANDLE_TYPE_MUTEX;
             }
             else
             {
@@ -639,15 +669,15 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       break;
       
       case 9:
+        //Createtask
         if(CREATE_IDLE_TASK== ((create_task_t*) param)->CreationFlags)
         {
           task_id=0;
         }
         else
         {
-          if(task_count<MAX_TASK_COUNT)
-            task_id=task_count+1;
-          else
+          task_id=__CLZ(~ExistTasks & 0x7FFFFFFF) & 0x0000001F; 
+          if(!task_id)
             task_id=INVALID_TID;
         }
         if(INVALID_TID!=task_id)
@@ -664,9 +694,11 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
               InitStack(TCB[task_id]);
               if ( !(((create_task_t*) param)->CreationFlags & CREATE_SUSPENDED) && task_id)
               {        
-                ReadyTasks|=0x80000000 >> task_id;
-                ReadyTasksCurrent|=0x80000000 >> task_id;                
-                ActiveTasks|=0x80000000 >> task_id;                
+                task_mask=TASK_MASK(task_id);
+                SET_READY_TASK_CURRENT(task_mask);
+                SET_READY_TASK(task_mask);
+                SET_ACTIVE_TASK(task_mask);
+                SET_EXIST_TASK(task_mask);
                 TCB[task_id]->State=0;
               }
               else
@@ -725,9 +757,10 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           if(task_id)
           {            
             //same task is waiting this message 
-            ((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks&=~(0x80000000>>task_id);    
-            ReadyTasksCurrent|=(0x80000000>>task_id);
-            ReadyTasks|=(0x80000000>>task_id); 
+            task_mask=TASK_MASK(task_id);
+            CLEAR_WAITING_TASK(((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks,task_mask);
+            SET_READY_TASK_CURRENT(task_mask);
+            SET_READY_TASK(task_mask); 
             TCB[task_id]->State&=~WAITING_HANDLE;            
             if( ((get_message_t*)TCB[task_id]->RequestStruct)->size>= ((get_message_t*)param)->size ) 
             {                        
@@ -762,9 +795,9 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
               //Mailbox is full. Send to sleep the task
               current_task->State=WAITING_HANDLE;
               current_task->RequestStruct=(void*) param;
-              ReadyTasksCurrent&=~(0x80000000>>current_task_id);
-              ReadyTasks&=~(0x80000000>>current_task_id);              
-              ((mailbox_t*)((send_message_t*)param)->handle)->write_waiting_tasks|=(0x80000000>>current_task_id);
+              CLEAR_READY_TASK_CURRENT(current_task_mask);
+              CLEAR_READY_TASK(current_task_mask);
+              SET_WAITING_TASK(((mailbox_t*)((send_message_t*)param)->handle)->write_waiting_tasks,current_task_mask);
               result=0xFFFFFFFF;               
             }            
           }
@@ -800,8 +833,8 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
              
               inc_mailbox_read_pointer( (mailbox_t*)((get_message_t*)param)->handle);                
                
-              task_id=__CLZ(((mailbox_t*)((get_message_t*)param)->handle)->write_waiting_tasks & ActiveTasks);
-              if(task_id<32)
+              task_id=__CLZ(((mailbox_t*)((get_message_t*)param)->handle)->write_waiting_tasks & ActiveTasks) & 0x0000001F;
+              if(task_id)
               {
                 ((mailbox_t*)((get_message_t*)param)->handle)->write_packet->size=((send_message_t*)TCB[task_id]->RequestStruct)->size;
                 memcpy( ((mailbox_t*)((send_message_t*)param)->handle)->write_packet->data,
@@ -809,9 +842,10 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
                         ((send_message_t*)TCB[task_id]->RequestStruct)->size); 
 
                 inc_mailbox_write_pointer( (mailbox_t*)((get_message_t*)param)->handle);                 
-                ((mailbox_t*)((get_message_t*)param)->handle)->write_waiting_tasks&=~(0x80000000>>task_id);    
-                ReadyTasksCurrent|=(0x80000000>>task_id);
-                ReadyTasks|=(0x80000000>>task_id); 
+                task_mask=TASK_MASK(task_id);
+                SET_WAITING_TASK( ((mailbox_t*)((get_message_t*)param)->handle)->write_waiting_tasks,task_mask);    
+                SET_READY_TASK_CURRENT(task_mask);
+                SET_READY_TASK(task_mask);  
                 TCB[task_id]->State&=~WAITING_HANDLE;
               }                
            }
@@ -826,9 +860,9 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
            //Empty box. Send to sleep the task
             current_task->State=WAITING_HANDLE;
             current_task->RequestStruct=(void*)param;
-            ReadyTasksCurrent&=~(0x80000000>>current_task_id);
-            ReadyTasks&=~(0x80000000>>current_task_id);              
-            ((mailbox_t*)((get_message_t*)param)->handle)->read_waiting_tasks|=(0x80000000>>current_task_id);
+            CLEAR_READY_TASK_CURRENT(current_task_mask);
+            CLEAR_READY_TASK(current_task_mask);             
+            SET_WAITING_TASK( ((mailbox_t*)((get_message_t*)param)->handle)->read_waiting_tasks, current_task_mask);
             result=0xFFFFFFFF;            
          }
       }
@@ -838,11 +872,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
         ((get_message_t*) param)->result=E_INVALID_HANDLE;
       }
       break;
-
-
-
-      
-    default:while(1);;break;  
+      default:while(1);;break;  
   }
   return result;
 }
