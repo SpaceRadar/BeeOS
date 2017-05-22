@@ -84,7 +84,8 @@ typedef struct
 
 typedef struct
 {
-  uint32_t   TypeAndOwner;
+  uint32_t   type;
+  tid_t      owner;
   task_set_t waiting_tasks; 
 }handle_base_t;
 
@@ -126,14 +127,8 @@ typedef struct
 
 typedef struct
 {
-  HANDLE   handle;
-  uint32_t time_out;
-  int32_t  result;
-}wait_for_single_object_t;
-
-typedef struct
-{
-  uint32_t  TypeAndOwner;  
+  uint32_t  type;
+  tid_t     owner;
   uint32_t  maxmsg;
   uint32_t  msgsize;
   uint32_t  paket_size;
@@ -156,6 +151,25 @@ typedef struct
 
 typedef struct
 {
+  uint32_t type;
+  uint32_t time_out;
+  int32_t result;
+  union
+  {  
+    HANDLE   handle;
+    HANDLE*  handle_array;
+  };
+  uint32_t still_waiting_handles;
+  uint32_t size;
+  union
+  {
+    uint32_t wait_all; 
+    void*    buffer;
+  };
+} wait_for_object_t;
+/*
+typedef struct
+{
   HANDLE   handle;
   uint32_t size;
   void*    buffer;
@@ -170,7 +184,13 @@ typedef struct
   int32_t  result;
 } get_message_t;
 
-
+typedef struct
+{
+  HANDLE   handle;
+  uint32_t time_out;
+  int32_t  result;
+}wait_for_single_object_t;
+*/
 typedef unsigned long  CRITICAL_SECTION;
 typedef unsigned long* LPCRITICAL_SECTION;
 
@@ -200,8 +220,8 @@ HANDLE CreateSemaphore (uint32_t InitialCount, uint32_t MaximumCount);
 int32_t ReleaseSemaphore (HANDLE handle, uint32_t ReleaseCount);
 
 HANDLE CreateMailBox(uint32_t maxmsg, uint32_t msgsize);
-int32_t SendMessage(HANDLE handle,uint32_t size, void* buffer);
-int32_t GetMessage(HANDLE handle,uint32_t size, void* buffer);
+int32_t SendMessage(HANDLE handle,uint32_t size, void* buffer, uint32_t time_out);
+int32_t GetMessage(HANDLE handle,uint32_t size, void* buffer, uint32_t time_out);
 
 tid_t CreateTask(uint32_t               StackSize, 
                  LPTHREAD_START_ROUTINE StartAddress, 
