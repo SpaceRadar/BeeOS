@@ -37,6 +37,9 @@
 
 #define INFINITE 0xFFFFFFFF  
 
+#define WAIT_FOR_SINGLE_OBJECT    0
+#define WAIT_FOR_MULTIPLE_OBJECTS 1
+
 /* Constants required to manipulate the NVIC. */
 #define portNVIC_SYSTICK_CTRL		( ( volatile unsigned long *) 0xe000e010 )
 #define portNVIC_SYSTICK_LOAD		( ( volatile unsigned long *) 0xe000e014 )
@@ -60,6 +63,26 @@ typedef void (*LPTHREAD_START_ROUTINE) (void*);
 typedef uint32_t tid_t;
 typedef uint32_t HANDLE;
 typedef uint32_t task_set_t;
+
+typedef struct
+{
+  uint32_t type;
+  uint32_t time_out;
+  int32_t result;
+  union
+  {  
+    HANDLE   handle;
+    HANDLE*  handle_array;
+  };
+  uint32_t still_waiting_handles;
+  uint32_t size;
+  union
+  {
+    uint32_t wait_all; 
+    void*    buffer;
+  };
+} wait_for_object_t;
+
 typedef struct
 {
   uint32_t* SP;
@@ -69,23 +92,12 @@ typedef struct
   unsigned long StackSize;
   void*    Parameter;
   uint32_t SleepParam;
-  void*    RequestStruct;
+  wait_for_object_t*    RequestStruct;
 } TCB_t;
 
 typedef struct
 {
-  unsigned long Owner;
-  int LockCounter;
-  unsigned long TaskWaiting;
-  unsigned long LowestWaitPriority;  
-  unsigned long TopWaitPriority;    
-}CRITICAL_SECTION_t;
-
-
-typedef struct
-{
   uint32_t   type;
-  tid_t      owner;
   task_set_t waiting_tasks; 
 }handle_base_t;
 
@@ -93,6 +105,7 @@ typedef struct
 typedef struct
 {
   handle_base_t base;
+  tid_t      owner;  
 }mutex_t;
 
 typedef struct
@@ -149,24 +162,7 @@ typedef struct
   HANDLE   handle; 
 }create_mailbox_t;
 
-typedef struct
-{
-  uint32_t type;
-  uint32_t time_out;
-  int32_t result;
-  union
-  {  
-    HANDLE   handle;
-    HANDLE*  handle_array;
-  };
-  uint32_t still_waiting_handles;
-  uint32_t size;
-  union
-  {
-    uint32_t wait_all; 
-    void*    buffer;
-  };
-} wait_for_object_t;
+
 /*
 typedef struct
 {
@@ -212,6 +208,8 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id);
 
 void ResumeTask (tid_t tid);
 int32_t WaitForSingleObject (HANDLE handle, uint32_t time_out);
+int32_t WaitForMultipleObjects (uint32_t count, HANDLE* handle_array,uint32_t wait_all, uint32_t time_out);
+
 
 HANDLE CreateMutex(uint32_t InitialOwner);
 int32_t ReleaseMutex (HANDLE handle);
