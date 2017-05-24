@@ -74,7 +74,8 @@ typedef struct
     HANDLE   handle;
     HANDLE*  handle_array;
   };
-  uint32_t still_waiting_handles;
+  uint32_t waiting_handles;
+  uint32_t stil_waiting_handles;  
   uint32_t size;
   union
   {
@@ -99,6 +100,7 @@ typedef struct
 {
   uint32_t   type;
   task_set_t waiting_tasks; 
+  task_set_t waiting_for_multiple_tasks;   
 }handle_base_t;
 
 

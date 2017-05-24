@@ -146,7 +146,8 @@ int32_t WaitForSingleObject (HANDLE handle, uint32_t time_out)
     wait_for_object.type=WAIT_FOR_SINGLE_OBJECT;    
     wait_for_object.handle_array=&handle;    
     wait_for_object.time_out=time_out;
-    wait_for_object.still_waiting_handles=1;
+    wait_for_object.waiting_handles=1;
+    wait_for_object.stil_waiting_handles=0;    
     WaitForSingleObjectAdapter(&wait_for_object);
   }
   else
@@ -162,7 +163,11 @@ int32_t WaitForMultipleObjects (uint32_t count, HANDLE* handle_array,uint32_t wa
   wait_for_object.type=WAIT_FOR_MULTIPLE_OBJECTS;
   wait_for_object.handle_array=handle_array;
   wait_for_object.time_out=time_out;
-  wait_for_object.still_waiting_handles=count;
+  wait_for_object.waiting_handles=count;
+  if(wait_all)
+    wait_for_object.stil_waiting_handles=count-1; 
+  else
+    wait_for_object.stil_waiting_handles=0; 
   wait_for_object.wait_all=wait_all;
   WaitForSingleObjectAdapter(&wait_for_object);
   return wait_for_object.result;
@@ -212,6 +217,7 @@ HANDLE CreateMutex(uint32_t InitialOwner)
     else
         handle->owner= HANDLE_OWNERLESS;  
     handle->base.waiting_tasks=0;
+    handle->base.waiting_for_multiple_tasks=0;
   }
   else
   {
@@ -226,7 +232,8 @@ HANDLE CreateSemaphore(uint32_t InitialCount, uint32_t MaximumCount)
   if(handle && (InitialCount<=MaximumCount) )
   {
       handle->base.type=HANDLE_TYPE_SEMAPHORE;  
-      handle->base.waiting_tasks=0;      
+      handle->base.waiting_tasks=0;     
+      handle->base.waiting_for_multiple_tasks=0;      
       handle->semaphore_count=InitialCount;
       handle->semaphore_max_count=MaximumCount;
   }
@@ -515,9 +522,23 @@ void inc_mailbox_read_pointer(mailbox_t* mailbox)
 uint32_t wakeup_waiting_handle_task(release_object_t* release_object)
 {
   uint32_t task_id;
+  uint32_t task_found;
   task_set_t task_mask;
-  task_id=__CLZ( ((handle_base_t*)release_object->handle)->waiting_tasks & ActiveTasks) & 0x0000001F;
-  if(task_id)
+  task_set_t temp_waiting_tasks;
+  
+  task_found=0;
+  temp_waiting_tasks=((handle_base_t*)release_object->handle)->waiting_tasks & ActiveTasks;
+  while(temp_waiting_tasks && !task_found)
+  {
+    task_id=__CLZ(temp_waiting_tasks);    
+    task_mask=TASK_MASK(task_id);
+    CLEAR_WAITING_TASK(temp_waiting_tasks,task_mask); 
+    if(!TCB[task_id]->RequestStruct->stil_waiting_handles)
+    {
+      task_found=1;
+    }
+  }
+  if(task_found)
   {                
     //same task is waiting this handle   
     task_mask=TASK_MASK(task_id);
@@ -526,6 +547,20 @@ uint32_t wakeup_waiting_handle_task(release_object_t* release_object)
     SET_READY_TASK(task_mask);
     TCB[task_id]->State&=~(WAITING_HANDLE | SLEEP_TASK);  
     ((wait_for_object_t*)TCB[task_id]->RequestStruct)->result=E_OK;
+  }
+  else
+  {
+    temp_waiting_tasks=((handle_base_t*)release_object->handle)->waiting_tasks & ActiveTasks;
+    ((handle_base_t*)release_object->handle)->waiting_for_multiple_tasks|=temp_waiting_tasks;
+    ((handle_base_t*)release_object->handle)->waiting_tasks^=temp_waiting_tasks;
+    while(temp_waiting_tasks)
+    {
+      task_id=__CLZ(temp_waiting_tasks); 
+      task_mask=TASK_MASK(task_id);
+      CLEAR_WAITING_TASK(temp_waiting_tasks,task_mask);       
+      --TCB[task_id]->RequestStruct->stil_waiting_handles;
+    } 
+    task_id=0;
   }
   return task_id;
   
@@ -540,6 +575,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
   uint32_t idx;
   uint32_t result=0; 
   uint32_t lock_handle;
+  uint32_t exit_loop;  
   mailbox_t* mailbox;
   task_set_t current_task_mask;
   task_set_t task_mask;
@@ -593,8 +629,8 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       break;
     case 7: 
       //WaiteForSingleObject
-      ((wait_for_object_t*) param)->result=E_TIME_OUT;        
-      for(idx=0;idx<((wait_for_object_t*) param)->still_waiting_handles;++idx)
+      exit_loop=0;
+      for(idx=0;(idx<((wait_for_object_t*) param)->waiting_handles) && !exit_loop;++idx)
       {  
         handle=((wait_for_object_t*) param)->handle_array[idx];  
         switch( ((handle_base_t*)handle)->type)
@@ -607,8 +643,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           break;         
           default: while(1); break;          
         }
-        if(lock_handle !=((wait_for_object_t*) param)->wait_all)
-           break;
+          exit_loop=(lock_handle !=((wait_for_object_t*) param)->wait_all);
       } 
 
       if(lock_handle)
@@ -616,6 +651,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
         for(;idx>0;--idx)
         {  
           handle=((wait_for_object_t*) param)->handle_array[idx-1];            
+          ((handle_base_t*)handle)->waiting_tasks|=((handle_base_t*)handle)->waiting_for_multiple_tasks;
           switch( ((handle_base_t*)handle)->type)
           {  
             case HANDLE_TYPE_SEMAPHORE:
@@ -628,7 +664,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
 
             default: while(1); break;          
           }
-          ((wait_for_object_t*) param)->result=E_OK+idx;
+          ((wait_for_object_t*) param)->result=E_OK+idx-1;
           //if we need to lock only one handle than exit
           if( !((wait_for_object_t*) param)->wait_all )
            break;          
@@ -637,6 +673,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       else
       {
         //set task sleep
+        ((wait_for_object_t*) param)->result=E_TIME_OUT;        
         if( ((wait_for_object_t*) param)->time_out )
         {
           current_task->SleepParam=((wait_for_object_t*) param)->time_out;              
@@ -655,7 +692,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           result=0xFFFFFFFF;              
         }                
         
-        for(idx=0;idx<((wait_for_object_t*) param)->still_waiting_handles;++idx)
+        for(idx=0;idx<((wait_for_object_t*) param)->waiting_handles;++idx)
         {  
           SET_WAITING_TASK( ((handle_base_t*)((wait_for_object_t*) param)->handle_array[idx])->waiting_tasks, current_task_mask);
         }                 
@@ -663,23 +700,20 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
     break;          
     case 8: 
       //ReleaseMutex, ReleaseSemaphore
-      switch(  *((uint32_t*)((release_object_t*) param)->handle) & HANDLE_TYPE_MASK )
+      handle=((release_object_t*) param)->handle;     
+      switch(  ((handle_base_t*)handle)->type )
       {
         case HANDLE_TYPE_SEMAPHORE:
           if( HANDLE_TYPE_SEMAPHORE==((release_object_t*) param)->handle_type)
           {
-            if( ((semaphore_t*)((release_object_t*) param)->handle)->semaphore_count+
-                ((release_object_t*) param)->release_count<=
-                ((semaphore_t*)((release_object_t*) param)->handle)->semaphore_max_count )
+            if( ((semaphore_t*)handle)->semaphore_count + ((release_object_t*) param)->release_count<= ((semaphore_t*)handle)->semaphore_max_count)
             {              
-              ((semaphore_t*)((release_object_t*) param)->handle)->semaphore_count+=((release_object_t*) param)->release_count;
+              ((semaphore_t*)handle)->semaphore_count += ((release_object_t*) param)->release_count;
               ((release_object_t*) param)->result=E_OK;              
                 
-              if(  (((semaphore_t*)((release_object_t*) param)->handle)->semaphore_count) &&
-                   wakeup_waiting_handle_task( (release_object_t*) param)
-                )    
+              if(  ((semaphore_t*)handle)->semaphore_count && wakeup_waiting_handle_task( (release_object_t*) param) )
               {
-                  --((semaphore_t*)((release_object_t*) param)->handle)->semaphore_count;
+                  --((semaphore_t*)handle)->semaphore_count;
               }                
             }
             else
