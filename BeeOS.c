@@ -14,7 +14,6 @@ static volatile task_set_t SleepTasks=0;
 static volatile task_set_t ActiveTasks=0;
 static volatile task_set_t ExistTasks=0;
 
-
 static volatile TCB_t* current_task;
 static volatile uint32_t task_count=0;
 static volatile uint32_t current_task_id;
@@ -79,7 +78,7 @@ void ResumeTask (tid_t tid)
        );    
 }
 
-void WaitForSingleObjectAdapter (wait_for_object_t* wait_for_object)
+void WaitForObjectAdapter (wait_for_object_t* wait_for_object)
 {
   __asm( 
         "     isb      \n"          
@@ -110,8 +109,8 @@ void CreateMailBoxAdapter(create_mailbox_t* create_mailbox)
         "     svc   10  \n"
        );   
 }
-/*
-void SendMessageAdapter(send_message_t* send_message)
+
+void SendMessageAdapter(wait_for_object_t* wait_for_object)
 {
   __asm( 
         "     isb      \n"          
@@ -119,14 +118,14 @@ void SendMessageAdapter(send_message_t* send_message)
        );   
 }
 
-void GetMessageAdapter(get_message_t* get_message)
+void GetMessageAdapter(wait_for_object_t* wait_for_object)
 {
   __asm( 
         "     isb      \n"          
         "     svc   12  \n"
        );   
 }
-*/
+
 
 #pragma diag_suppress=Pe940 
 void* AllocateMem(uint32_t size)
@@ -144,11 +143,11 @@ int32_t WaitForSingleObject (HANDLE handle, uint32_t time_out)
   if(handle && (INVALID_HANDLE!=handle))
   {
     wait_for_object.type=WAIT_FOR_SINGLE_OBJECT;    
-    wait_for_object.handle_array=&handle;    
+    wait_for_object.handles=&handle;    
     wait_for_object.time_out=time_out;
     wait_for_object.waiting_handles=1;
     wait_for_object.stil_waiting_handles=0;    
-    WaitForSingleObjectAdapter(&wait_for_object);
+    WaitForObjectAdapter(&wait_for_object);
   }
   else
   {
@@ -157,11 +156,11 @@ int32_t WaitForSingleObject (HANDLE handle, uint32_t time_out)
   return wait_for_object.result;
 }
 
-int32_t WaitForMultipleObjects (uint32_t count, HANDLE* handle_array,uint32_t wait_all, uint32_t time_out)
+int32_t WaitForMultipleObjects (uint32_t count, HANDLE* handles,uint32_t wait_all, uint32_t time_out)
 {
   wait_for_object_t wait_for_object;
   wait_for_object.type=WAIT_FOR_MULTIPLE_OBJECTS;
-  wait_for_object.handle_array=handle_array;
+  wait_for_object.handles=handles;
   wait_for_object.time_out=time_out;
   wait_for_object.waiting_handles=count;
   if(wait_all)
@@ -169,7 +168,7 @@ int32_t WaitForMultipleObjects (uint32_t count, HANDLE* handle_array,uint32_t wa
   else
     wait_for_object.stil_waiting_handles=0; 
   wait_for_object.wait_all=wait_all;
-  WaitForSingleObjectAdapter(&wait_for_object);
+  WaitForObjectAdapter(&wait_for_object);
   return wait_for_object.result;
 }
 
@@ -244,9 +243,11 @@ HANDLE CreateSemaphore(uint32_t InitialCount, uint32_t MaximumCount)
   return (HANDLE) handle;
 }
 
-HANDLE CreateMailBox(uint32_t maxmsg, uint32_t msgsize)
+int32_t CreateMailBox(HANDLE* read_slot, HANDLE* write_slot, uint32_t maxmsg, uint32_t msgsize)
 {
   create_mailbox_t create_mailbox;
+  create_mailbox.read_slot=read_slot;
+  create_mailbox.write_slot=write_slot;  
   create_mailbox.maxmsg=maxmsg;
   create_mailbox.msgsize=msgsize;
   
@@ -254,7 +255,7 @@ HANDLE CreateMailBox(uint32_t maxmsg, uint32_t msgsize)
     CreateMailBoxAdapter(&create_mailbox);  
   else
     SVCHandler_main((uint32_t) &create_mailbox, 10);  
-  return create_mailbox.handle;
+  return create_mailbox.result;
 }
 
 
@@ -280,12 +281,12 @@ int32_t SendMessage(HANDLE handle,uint32_t size, void* buffer, uint32_t time_out
 {
   wait_for_object_t wait_for_object;
   
+  wait_for_object.type=HANDLE_TYPE_MAILBOX_WRITE;
   wait_for_object.handle=handle;
   wait_for_object.buffer=buffer;
   wait_for_object.size=size;
-  wait_for_object.time_out=time_out;
-  
-//  SendMessageAdapter(&send_message);
+  wait_for_object.time_out=time_out;  
+  SendMessageAdapter(&wait_for_object);
   return wait_for_object.result;
 }
 
@@ -293,12 +294,12 @@ int32_t GetMessage(HANDLE handle,uint32_t size, void* buffer, uint32_t time_out)
 {
   wait_for_object_t wait_for_object;
   
+  wait_for_object.type=HANDLE_TYPE_MAILBOX_READ;  
   wait_for_object.handle=handle;
   wait_for_object.buffer=buffer;
   wait_for_object.size=size;
-  wait_for_object.time_out=time_out;
-  
-//  SendMessageAdapter(&send_message);
+  wait_for_object.time_out=time_out; 
+  GetMessageAdapter(&wait_for_object);
   return wait_for_object.result;
 }
 
@@ -397,6 +398,7 @@ void coreSheduler(unsigned long bSysTymer)
   task_set_t SleepTasksTemp;
   task_set_t task_mask;
   uint32_t task_id;
+  uint32_t idx;
   
   SleepTasksTemp=SleepTasks;
   while(bSysTymer && SleepTasksTemp)
@@ -414,7 +416,11 @@ void coreSheduler(unsigned long bSysTymer)
       if(TCB[task_id]->State & WAITING_HANDLE)
       {
         TCB[task_id]->State&= ~(SLEEP_TASK | WAITING_HANDLE);       
-//        CLEAR_WAITING_TASK(((handle_base_t*)((wait_for_single_object_t*)TCB[task_id]->RequestStruct)->handle)->waiting_tasks, task_mask);
+        for(idx=0;idx<TCB[task_id]->RequestStruct->waiting_handles;++idx)
+        {
+          CLEAR_WAITING_TASK(((handle_base_t*)TCB[task_id]->RequestStruct->handles[idx])->waiting_tasks,task_mask);
+          CLEAR_WAITING_TASK(((handle_base_t*)TCB[task_id]->RequestStruct->handles[idx])->waiting_for_multiple_tasks,task_mask);        
+        }
       }
       else
       {  
@@ -485,40 +491,22 @@ void* coreAllocateMem(uint32_t size)
   return malloc(size);
 }
 
-void inc_mailbox_write_pointer(mailbox_t* mailbox)  
+void inc_mailbox_pointer(mailbox_slot_t* slot)  
 {
-  ++mailbox->write_idx;   
-  if( mailbox->write_idx < mailbox->maxmsg)
+  ++slot->idx;
+  if( slot->idx < slot->mailbox_base->maxmsg )
   {    
     //move write pointer on one step
-    mailbox->write_packet= (mailbox_packet_t*)((uint32_t) mailbox->write_packet + mailbox->paket_size);               
+    slot->packet= (mailbox_packet_t*)((uint32_t) slot->packet + slot->mailbox_base->paket_size);               
   }
   else
   {
     //move write pointer to first position              
-    mailbox->write_packet=mailbox->buffer;
-    mailbox->write_idx=0;              
-  }    
-  ++mailbox->counter;  
+    slot->packet=slot->mailbox_base->buffer;
+    slot->idx=0;              
+  }     
 }
         
-void inc_mailbox_read_pointer(mailbox_t* mailbox)  
-{
-  ++mailbox->read_idx;   
-  if( mailbox->read_idx < mailbox->maxmsg)
-  {    
-    //move write pointer on one step
-    mailbox->read_packet= (mailbox_packet_t*)((uint32_t) mailbox->read_packet + mailbox->paket_size);               
-  }
-  else
-  {
-    //move write pointer to first position              
-    mailbox->read_packet=mailbox->buffer;
-    mailbox->read_idx=0;              
-  } 
-  --mailbox->counter;
-}
-
 uint32_t wakeup_waiting_handle_task(release_object_t* release_object)
 {
   uint32_t task_id;
@@ -551,8 +539,8 @@ uint32_t wakeup_waiting_handle_task(release_object_t* release_object)
   else
   {
     temp_waiting_tasks=((handle_base_t*)release_object->handle)->waiting_tasks & ActiveTasks;
-    ((handle_base_t*)release_object->handle)->waiting_for_multiple_tasks|=temp_waiting_tasks;
-    ((handle_base_t*)release_object->handle)->waiting_tasks^=temp_waiting_tasks;
+    ((handle_base_t*)release_object->handle)->waiting_for_multiple_tasks=((handle_base_t*)release_object->handle)->waiting_tasks;
+    ((handle_base_t*)release_object->handle)->waiting_tasks=0;
     while(temp_waiting_tasks)
     {
       task_id=__CLZ(temp_waiting_tasks); 
@@ -563,10 +551,37 @@ uint32_t wakeup_waiting_handle_task(release_object_t* release_object)
     task_id=0;
   }
   return task_id;
-  
-  
 }
-        
+
+uint32_t set_sleep_waiting_handle_task(wait_for_object_t* wait_for_object, task_set_t current_task_mask)
+{
+  uint32_t result;
+  uint32_t idx;
+  result=0x00000000;
+  if( wait_for_object->time_out )
+  {
+    current_task->SleepParam=wait_for_object->time_out;              
+    if( INFINITE==wait_for_object->time_out )
+    {
+      current_task->State=WAITING_HANDLE;   
+    }
+    else
+    {
+      current_task->State=WAITING_HANDLE | SLEEP_TASK;
+      SET_SLEEP_TASK(current_task_mask);  
+    }
+    CLEAR_READY_TASK_CURRENT(current_task_mask);
+    CLEAR_READY_TASK(current_task_mask);  
+    current_task->RequestStruct=wait_for_object;          
+    result=0xFFFFFFFF;              
+  }                
+  
+  for(idx=0;idx<wait_for_object->waiting_handles;++idx)
+  {  
+    SET_WAITING_TASK( ((handle_base_t*)wait_for_object->handles[idx])->waiting_tasks, current_task_mask);
+  }
+  return result;
+}
 
 
 static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
@@ -577,6 +592,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
   uint32_t lock_handle;
   uint32_t exit_loop;  
   mailbox_t* mailbox;
+  mailbox_slot_t* slot;
   task_set_t current_task_mask;
   task_set_t task_mask;
   HANDLE handle;
@@ -632,7 +648,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       exit_loop=0;
       for(idx=0;(idx<((wait_for_object_t*) param)->waiting_handles) && !exit_loop;++idx)
       {  
-        handle=((wait_for_object_t*) param)->handle_array[idx];  
+        handle=((wait_for_object_t*) param)->handles[idx];  
         switch( ((handle_base_t*)handle)->type)
         {  
           case HANDLE_TYPE_SEMAPHORE:
@@ -640,7 +656,18 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           break;        
           case HANDLE_TYPE_MUTEX:
             lock_handle= (((mutex_t*)handle)->owner == HANDLE_OWNERLESS) ||  (((mutex_t*)handle)->owner == current_task_id);
-          break;         
+          break;  
+          
+          case HANDLE_TYPE_MAILBOX_READ:
+            lock_handle=((mailbox_slot_t*)handle)->mailbox_base->counter && 
+              (((mailbox_slot_t*)handle)->owner == HANDLE_OWNERLESS) ||  (((mailbox_slot_t*)handle)->owner == current_task_id);
+          break;
+          
+          case HANDLE_TYPE_MAILBOX_WRITE:
+            lock_handle=(((mailbox_slot_t*)handle)->mailbox_base->counter<((mailbox_slot_t*)handle)->mailbox_base->maxmsg) &&
+              (((mailbox_slot_t*)handle)->owner == HANDLE_OWNERLESS) ||  (((mailbox_slot_t*)handle)->owner == current_task_id);              
+          break;
+          
           default: while(1); break;          
         }
           exit_loop=(lock_handle !=((wait_for_object_t*) param)->wait_all);
@@ -650,8 +677,9 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       {
         for(;idx>0;--idx)
         {  
-          handle=((wait_for_object_t*) param)->handle_array[idx-1];            
+          handle=((wait_for_object_t*) param)->handles[idx-1];            
           ((handle_base_t*)handle)->waiting_tasks|=((handle_base_t*)handle)->waiting_for_multiple_tasks;
+          ((handle_base_t*)handle)->waiting_for_multiple_tasks=0;
           switch( ((handle_base_t*)handle)->type)
           {  
             case HANDLE_TYPE_SEMAPHORE:
@@ -660,8 +688,13 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
 
             case HANDLE_TYPE_MUTEX:
               ((mutex_t*)handle)->owner=current_task_id;
-            break;         
+            break;     
 
+            case HANDLE_TYPE_MAILBOX_READ:  
+            case HANDLE_TYPE_MAILBOX_WRITE:              
+               ((mailbox_slot_t*)handle)->owner=current_task_id;
+            break;
+            
             default: while(1); break;          
           }
           ((wait_for_object_t*) param)->result=E_OK+idx-1;
@@ -673,29 +706,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       else
       {
         //set task sleep
-        ((wait_for_object_t*) param)->result=E_TIME_OUT;        
-        if( ((wait_for_object_t*) param)->time_out )
-        {
-          current_task->SleepParam=((wait_for_object_t*) param)->time_out;              
-          if( INFINITE==((wait_for_object_t*) param)->time_out )
-          {
-            current_task->State=WAITING_HANDLE;   
-          }
-          else
-          {
-            current_task->State=WAITING_HANDLE | SLEEP_TASK;
-            SET_SLEEP_TASK(current_task_mask);  
-          }
-          CLEAR_READY_TASK_CURRENT(current_task_mask);
-          CLEAR_READY_TASK(current_task_mask);  
-          current_task->RequestStruct=(void*)param;          
-          result=0xFFFFFFFF;              
-        }                
-        
-        for(idx=0;idx<((wait_for_object_t*) param)->waiting_handles;++idx)
-        {  
-          SET_WAITING_TASK( ((handle_base_t*)((wait_for_object_t*) param)->handle_array[idx])->waiting_tasks, current_task_mask);
-        }                 
+        result=set_sleep_waiting_handle_task((wait_for_object_t*) param, current_task_mask);             
       }
     break;          
     case 8: 
@@ -731,9 +742,9 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
         case HANDLE_TYPE_MUTEX:
           if( HANDLE_TYPE_MUTEX==((release_object_t*) param)->handle_type)
           {
-            if( (*((uint32_t*)((release_object_t*) param)->handle) & HANDLE_TASK_ID_MASK) == current_task_id)
+            if( ((mutex_t*)handle)->owner ==current_task_id )
             {              
-                *((uint32_t*)((release_object_t*) param)->handle)= wakeup_waiting_handle_task( (release_object_t*) param) | HANDLE_TYPE_MUTEX;
+                ((mutex_t*)handle)->owner= wakeup_waiting_handle_task( (release_object_t*) param);
             }
             else
             {
@@ -803,101 +814,148 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           }
         }        
       break;
-#if 0      
+      
       case 10:
         mailbox=malloc(sizeof(mailbox_t));
         if(mailbox)
-        {
-          mailbox->TypeAndOwner=HANDLE_TYPE_MAILBOX;
-          mailbox->maxmsg= ((create_mailbox_t*)param)->maxmsg;
-          mailbox->msgsize= ((create_mailbox_t*)param)->msgsize;
-          mailbox->paket_size=(mailbox->msgsize+7) & 0xFFFFFFFC;
-          mailbox->buffer=malloc(mailbox->maxmsg*mailbox->paket_size);
-          if(mailbox->buffer)
+        {         
+          mailbox->mailbox_base.maxmsg= ((create_mailbox_t*)param)->maxmsg;
+          mailbox->mailbox_base.msgsize= ((create_mailbox_t*)param)->msgsize;
+          mailbox->mailbox_base.paket_size=(mailbox->mailbox_base.paket_size+7) & 0xFFFFFFFC;
+          mailbox->mailbox_base.buffer=malloc(mailbox->mailbox_base.maxmsg*mailbox->mailbox_base.paket_size);
+          if(mailbox->mailbox_base.buffer)
           {
-            mailbox->read_idx=0;
-            mailbox->write_idx=0;
-            mailbox->counter=0; 
-            mailbox->read_packet=mailbox->buffer;
-            mailbox->write_packet=mailbox->buffer;            
+            mailbox->read_slot.base.type=HANDLE_TYPE_MAILBOX_READ;
+            mailbox->read_slot.base.waiting_tasks=0;
+            mailbox->read_slot.base.waiting_for_multiple_tasks=0;
+            mailbox->read_slot.idx=0;
+            mailbox->read_slot.owner=HANDLE_OWNERLESS;
+            mailbox->read_slot.packet=mailbox->mailbox_base.buffer;
+            mailbox->read_slot.mailbox_base=&mailbox->mailbox_base;
+            *((create_mailbox_t*)param)->read_slot=(HANDLE)&mailbox->read_slot;
+
+            mailbox->write_slot.base.type=HANDLE_TYPE_MAILBOX_WRITE;
+            mailbox->write_slot.base.waiting_tasks=0;
+            mailbox->write_slot.base.waiting_for_multiple_tasks=0;
+            mailbox->write_slot.idx=0;
+            mailbox->read_slot.owner=HANDLE_OWNERLESS;            
+            mailbox->write_slot.packet=mailbox->mailbox_base.buffer;
+            mailbox->write_slot.mailbox_base=&mailbox->mailbox_base;
+            *((create_mailbox_t*)param)->write_slot=(HANDLE)&mailbox->write_slot;
+
+            ((create_mailbox_t*)param)->result=E_OK;                        
           }
           else
           {
             free(mailbox);
             mailbox=0;
+            ((create_mailbox_t*)param)->result=E_OUT_OF_MEMORY;
+            *((create_mailbox_t*)param)->read_slot=INVALID_HANDLE;
+            *((create_mailbox_t*)param)->read_slot=INVALID_HANDLE;            
           }
         }
-        ((create_mailbox_t*)param)->handle=(uint32_t)mailbox;
       break;
+     
       case 11:
-      //SendMessage 
-      if(  ((send_message_t*)param)->handle &&  (*((uint32_t*) ((send_message_t*)param)->handle)==HANDLE_TYPE_MAILBOX) )
+        //SetMessage and GetMessage
+        if(  ((wait_for_object_t*)param)->handle  && (((wait_for_object_t*)param)->handle!=INVALID_HANDLE) ) 
+        {     
+          handle=((wait_for_object_t*)param)->handle;        
+          switch( ((handle_base_t*)handle)->type )
+          {  
+            case HANDLE_TYPE_MAILBOX_READ:
+              lock_handle=((mailbox_slot_t*)handle)->mailbox_base->counter && 
+                (((mailbox_slot_t*)handle)->owner == HANDLE_OWNERLESS) ||  (((mailbox_slot_t*)handle)->owner == current_task_id);
+              
+            break;
+          
+            case HANDLE_TYPE_MAILBOX_WRITE:
+              lock_handle=(((mailbox_slot_t*)handle)->mailbox_base->counter<((mailbox_slot_t*)handle)->mailbox_base->maxmsg) &&
+                (((mailbox_slot_t*)handle)->owner == HANDLE_OWNERLESS) ||  (((mailbox_slot_t*)handle)->owner == current_task_id);              
+                             
+            break;
+            
+            default: while(1); break;             
+          }
+          
+          if(lock_handle)
+          {
+            
+          }
+        }
+        else
+        {
+          //Invalid or not a MailBox handle
+          ((wait_for_object_t*) param)->result=E_INVALID_HANDLE;          
+        }
+      break;
+#if 0
       {
-        if( ((send_message_t*)param)->size<= ((mailbox_t*)((send_message_t*)param)->handle)->msgsize )
+
+        slot= ((mailbox_slot_t*)handle);
+        if( ((wait_for_object_t*)param)->size<= slot->mailbox_base->maxmsg)
         {   
-          task_id=__CLZ(((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks & ActiveTasks) & 0x0000001F;
+          task_id=__CLZ(slot->base.waiting_tasks & ActiveTasks) & 0x0000001F;
           if(task_id)
           {            
             //same task is waiting this message 
             task_mask=TASK_MASK(task_id);
-            CLEAR_WAITING_TASK(((mailbox_t*)((send_message_t*)param)->handle)->read_waiting_tasks,task_mask);
+            CLEAR_WAITING_TASK(slot->base.waiting_tasks,task_mask);
             SET_READY_TASK_CURRENT(task_mask);
             SET_READY_TASK(task_mask); 
-            TCB[task_id]->State&=~WAITING_HANDLE;            
-            if( ((get_message_t*)TCB[task_id]->RequestStruct)->size>= ((get_message_t*)param)->size ) 
+            TCB[task_id]->State&=~(WAITING_HANDLE | SLEEP_TASK);
+            
+            if(TCB[task_id]->RequestStruct->size>= ((wait_for_object_t*)param)->size) 
             {                        
-                memcpy( ((get_message_t*)TCB[task_id]->RequestStruct)->buffer,
-                        ((send_message_t*)param)->buffer,
-                        ((send_message_t*)param)->size
+                memcpy( TCB[task_id]->RequestStruct->buffer,
+                        ((wait_for_object_t*)param)->buffer,
+                        ((wait_for_object_t*)param)->size
                       );             
-                ((get_message_t*)TCB[task_id]->RequestStruct)->result=((send_message_t*)param)->size;
+               TCB[task_id]->RequestStruct->result=((wait_for_object_t*)param)->size;
             }
             else
             {
                 //buffer too small
-                ((get_message_t*)TCB[task_id]->RequestStruct)->result=E_BUFFER_TOO_SMALL;              
+                TCB[task_id]->RequestStruct->result=E_BUFFER_TOO_SMALL;              
                 task_id=0;
             }            
           } 
           if(!task_id)
           {
             //No one task is waiting this message 
-            if( ((mailbox_t*)((send_message_t*)param)->handle)->counter< ((mailbox_t*)((send_message_t*)param)->handle)->maxmsg )
+            if( slot->mailbox_base->counter< slot->mailbox_base->maxmsg )
             {
               //There is a room for this message
-              ((mailbox_t*)((send_message_t*)param)->handle)->write_packet->size=((send_message_t*)param)->size;
-              memcpy( ((mailbox_t*)((send_message_t*)param)->handle)->write_packet->data,
-                      ((send_message_t*)param)->buffer,
-                      ((send_message_t*)param)->size); 
+              slot->packet->size=((wait_for_object_t*)param)->size;
+              memcpy( slot->packet->data,
+                      ((wait_for_object_t*)param)->buffer,
+                      ((wait_for_object_t*)param)->size); 
 
-              inc_mailbox_write_pointer( (mailbox_t*)((send_message_t*)param)->handle);                
+              inc_mailbox_pointer( slot );                
             }
             else
             {
               //Mailbox is full. Send to sleep the task
-              current_task->State=WAITING_HANDLE;
-              current_task->RequestStruct=(void*) param;
-              CLEAR_READY_TASK_CURRENT(current_task_mask);
-              CLEAR_READY_TASK(current_task_mask);
-              SET_WAITING_TASK(((mailbox_t*)((send_message_t*)param)->handle)->write_waiting_tasks,current_task_mask);
-              result=0xFFFFFFFF;               
+              result=set_sleep_waiting_handle_task((wait_for_object_t*) param, current_task_mask);
             }            
           }
           //All OK
-          ((send_message_t*) param)->result=E_OK;
+          ((wait_for_object_t*) param)->result=E_OK;
         }
         else
         {
           //Too long message
-          ((send_message_t*) param)->result=E_BUFFER_TOO_SMALL;          
+          ((wait_for_object_t*) param)->result=E_BUFFER_TOO_SMALL;          
         }
       }
       else
       {
         //Invalid or not a MailBox handle
-        ((send_message_t*) param)->result=E_INVALID_HANDLE;
+        ((wait_for_object_t*) param)->result=E_INVALID_HANDLE;
       }
       break;
+#endif
+#if 0      
       case 12:
       //GetMessage  
       if(  ((get_message_t*)param)->handle &&  (*((uint32_t*) ((get_message_t*)param)->handle)==HANDLE_TYPE_MAILBOX) )
