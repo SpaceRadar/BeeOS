@@ -79,7 +79,7 @@ typedef struct
     HANDLE*  handles;
   };
   uint32_t waiting_handles;
-  uint32_t stil_waiting_handles;  
+  uint32_t still_waiting_handles;  
   uint32_t size;
   union
   {  
@@ -156,15 +156,15 @@ typedef struct
   mailbox_packet_t*  write_packet;  
 }mailbox_base_t;
 
-typedef struct
-{
-  
-  handle_base_t      base; 
-  mailbox_base_t*    mailbox_base;  
-  uint32_t           idx;
-  tid_t              owner; 
-  mailbox_packet_t*  packet;  
-}mailbox_slot_t;
+typedef struct mailbox_slot_t
+{  
+  handle_base_t           base; 
+  mailbox_base_t*         mailbox_base;  
+  uint32_t                idx;
+  tid_t                   owner; 
+  struct mailbox_slot_t*  opposite_slot;
+  mailbox_packet_t*       packet;  
+} mailbox_slot_t;
 
 
 
@@ -217,6 +217,8 @@ tid_t CreateTask(uint32_t               StackSize,
                  uint32_t               CreationFlags);
 
 
+/////////////////////////////////////////////////////////////////////////////
+void coreSheduler(unsigned long bSysTymer);
 
 
 #endif

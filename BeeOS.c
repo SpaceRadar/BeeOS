@@ -146,7 +146,7 @@ int32_t WaitForSingleObject (HANDLE handle, uint32_t time_out)
     wait_for_object.handles=&handle;    
     wait_for_object.time_out=time_out;
     wait_for_object.waiting_handles=1;
-    wait_for_object.stil_waiting_handles=0;    
+    wait_for_object.still_waiting_handles=0;    
     WaitForObjectAdapter(&wait_for_object);
   }
   else
@@ -164,9 +164,9 @@ int32_t WaitForMultipleObjects (uint32_t count, HANDLE* handles,uint32_t wait_al
   wait_for_object.time_out=time_out;
   wait_for_object.waiting_handles=count;
   if(wait_all)
-    wait_for_object.stil_waiting_handles=count-1; 
+    wait_for_object.still_waiting_handles=count-1; 
   else
-    wait_for_object.stil_waiting_handles=0; 
+    wait_for_object.still_waiting_handles=0; 
   wait_for_object.wait_all=wait_all;
   WaitForObjectAdapter(&wait_for_object);
   return wait_for_object.result;
@@ -207,7 +207,7 @@ int32_t ReleaseMutex (HANDLE handle)
 
 HANDLE CreateMutex(uint32_t InitialOwner)
 {
-  mutex_t* handle=AllocateMem(sizeof(mutex_t));
+  mutex_t* handle=(mutex_t*)AllocateMem(sizeof(mutex_t));
   if(handle)
   {
     handle->base.type=HANDLE_TYPE_MUTEX;
@@ -227,7 +227,7 @@ HANDLE CreateMutex(uint32_t InitialOwner)
 
 HANDLE CreateSemaphore(uint32_t InitialCount, uint32_t MaximumCount)
 {
-  semaphore_t* handle=AllocateMem(sizeof(semaphore_t));
+  semaphore_t* handle=(semaphore_t*)AllocateMem(sizeof(semaphore_t));
   if(handle && (InitialCount<=MaximumCount) )
   {
       handle->base.type=HANDLE_TYPE_SEMAPHORE;  
@@ -353,46 +353,6 @@ void InitStack(TCB_t* TCB)
   TCB->SP= SP;
 }
 
-void SysTick_Handler(void)
-{
-  *(portNVIC_INT_CTRL) = portNVIC_PENDSVSET;  
-}
-
-void PendSV_Handler(void)
-{
-  __asm(   
-          "     mrs     r3,psp                  \n"            
-          "     ldr     r1,[r3,#24]             \n"
-          "     ldrb    r1,[r1,#-2]             \n"
-
-            
-          "     ldr.n   r2,current_task_local   \n"         
-          "     ldr     r2,[r2]                 \n"                       
-            
-          "    	push    {lr}                    \n"             
-          "    	stmdb   r3!, {r4-r11}           \n"            
-          "     str     r3,[r2]                 \n"   
-
-          "     ldr.n   r3,coreSheduler_local   \n"               
-          "     mov     r0,#1                   \n"  
-          "     blx     r3                      \n"  
-            
-          "    	pop     {lr}                    \n"                             
-          "     ldr.n   r2,current_task_local   \n"         
-          "     ldr     r2,[r2]                 \n"
-          "     ldr     r2,[r2]                 \n"            
-          "	ldmia   r2!, {r4-r11}           \n"               
-          "     msr     psp, r2                 \n"           
-          "	orr     r14, r14, #13           \n"
-          "     bx      lr                      \n" 
-          "     dc16    0                       \n"  
-          "coreSheduler_local:                  \n"
-          "     dc32    coreSheduler            \n"              
-          "current_task_local:                  \n"
-          "     dc32    current_task            \n"             
-       );  
-}
-
 void coreSheduler(unsigned long bSysTymer)
 {
   task_set_t SleepTasksTemp;
@@ -446,27 +406,55 @@ void coreSheduler(unsigned long bSysTymer)
     }   
 }
 
+void SysTick_Handler(void)
+{
+  *(portNVIC_INT_CTRL) = portNVIC_PENDSVSET;  
+}
+
+void PendSV_Handler(void)
+{
+  __asm(   
+          "     mrs     r3,psp                  \n"            
+          "     ldr     r1,[r3,#24]             \n"
+          "     ldrb    r1,[r1,#-2]             \n"
+
+            
+          "     ldr.n   r2,current_task_local   \n"         
+          "     ldr     r2,[r2]                 \n"                       
+            
+          "    	push    {lr}                    \n"             
+          "    	stmdb   r3!, {r4-r11}           \n"            
+          "     str     r3,[r2]                 \n"   
+
+          "     ldr.n   r3,coreSheduler_local   \n"               
+          "     mov     r0,#1                   \n"  
+          "     blx     r3                      \n"  
+            
+          "    	pop     {lr}                    \n"                             
+          "     ldr.n   r2,current_task_local   \n"         
+          "     ldr     r2,[r2]                 \n"
+          "     ldr     r2,[r2]                 \n"            
+          "	ldmia   r2!, {r4-r11}           \n"               
+          "     msr     psp, r2                 \n"           
+          "	orr     r14, r14, #13           \n"
+          "     bx      lr                      \n" 
+          "     nop                             \n"
+#ifdef __cplusplus
+          "coreSheduler_local:                  \n"
+          "     dc32    _Z12coreShedulerm       \n"                            
+#else            
+          "coreSheduler_local:                  \n"
+          "     dc32    coreSheduler            \n"              
+#endif            
+          "current_task_local:                  \n"
+          "     dc32    current_task            \n"             
+            
+       );  
+}
 
 void StartFirstTask()
 {
-//  uint32_t idx;
   CreateTask(64,IdleTask,(void*) 0, CREATE_IDLE_TASK);
-/*  
-  for(idx=0;TCB[idx]->SP;++idx)
-  {
-    InitStack(idx,TCB[idx]->lpStartAddress, TCB[idx]->Param); 
-    if(idx>0)
-    {
-      if ( !(TCB[idx]->State & CREATE_SUSPENDED))
-      {        
-        ReadyTasks|=0x80000000 >> idx;
-      }
-    }
-  }
-  
-  ReadyTasksCurrent=ReadyTasks;
-*/  
-//  Sheduler();
   beeos_running=1;
 #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)  
   *((__IO uint32_t*) 0xE000EF34)|=0x80000000;  
@@ -502,26 +490,27 @@ void inc_mailbox_pointer(mailbox_slot_t* slot)
   else
   {
     //move write pointer to first position              
-    slot->packet=slot->mailbox_base->buffer;
+    slot->packet=(mailbox_packet_t*)slot->mailbox_base->buffer;
     slot->idx=0;              
   }     
 }
         
-uint32_t wakeup_waiting_handle_task(release_object_t* release_object)
+uint32_t wakeup_waiting_handle_task(handle_base_t* handle_base)
 {
   uint32_t task_id;
   uint32_t task_found;
+  uint32_t idx;
   task_set_t task_mask;
   task_set_t temp_waiting_tasks;
   
   task_found=0;
-  temp_waiting_tasks=((handle_base_t*)release_object->handle)->waiting_tasks & ActiveTasks;
+  temp_waiting_tasks=handle_base->waiting_tasks & ActiveTasks;
   while(temp_waiting_tasks && !task_found)
   {
     task_id=__CLZ(temp_waiting_tasks);    
     task_mask=TASK_MASK(task_id);
     CLEAR_WAITING_TASK(temp_waiting_tasks,task_mask); 
-    if(!TCB[task_id]->RequestStruct->stil_waiting_handles)
+    if(!TCB[task_id]->RequestStruct->still_waiting_handles)
     {
       task_found=1;
     }
@@ -530,23 +519,28 @@ uint32_t wakeup_waiting_handle_task(release_object_t* release_object)
   {                
     //same task is waiting this handle   
     task_mask=TASK_MASK(task_id);
-    CLEAR_WAITING_TASK( ((handle_base_t*)release_object->handle)->waiting_tasks,task_mask); 
+    CLEAR_WAITING_TASK( handle_base->waiting_tasks,task_mask); 
     SET_READY_TASK_CURRENT(task_mask);
     SET_READY_TASK(task_mask);
     TCB[task_id]->State&=~(WAITING_HANDLE | SLEEP_TASK);  
-    ((wait_for_object_t*)TCB[task_id]->RequestStruct)->result=E_OK;
+    idx=0;
+    while(TCB[task_id]->RequestStruct->handles[idx]!=(HANDLE) handle_base)
+    {
+      ++idx;
+    }
+    TCB[task_id]->RequestStruct->result=E_OK+idx;
   }
   else
   {
-    temp_waiting_tasks=((handle_base_t*)release_object->handle)->waiting_tasks & ActiveTasks;
-    ((handle_base_t*)release_object->handle)->waiting_for_multiple_tasks=((handle_base_t*)release_object->handle)->waiting_tasks;
-    ((handle_base_t*)release_object->handle)->waiting_tasks=0;
+    temp_waiting_tasks=handle_base->waiting_tasks & ActiveTasks;
+    handle_base->waiting_for_multiple_tasks=handle_base->waiting_tasks;
+    handle_base->waiting_tasks=0;
     while(temp_waiting_tasks)
     {
       task_id=__CLZ(temp_waiting_tasks); 
       task_mask=TASK_MASK(task_id);
       CLEAR_WAITING_TASK(temp_waiting_tasks,task_mask);       
-      --TCB[task_id]->RequestStruct->stil_waiting_handles;
+      --TCB[task_id]->RequestStruct->still_waiting_handles;
     } 
     task_id=0;
   }
@@ -583,8 +577,12 @@ uint32_t set_sleep_waiting_handle_task(wait_for_object_t* wait_for_object, task_
   return result;
 }
 
+void lock_handles(wait_for_object_t* wait_for_object)
+{
+  
+}
 
-static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
+uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
 {
   uint32_t task_id;
   uint32_t idx;
@@ -626,7 +624,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       CLEAR_READY_TASK(current_task_mask);  
       CLEAR_EXIST_TASK(current_task_mask);
       free(TCB[current_task_id]->SP);
-      TCB[current_task_id]->SP=(void*)NULL;
+      TCB[current_task_id]->SP=(uint32_t*)NULL;
       result=0xFFFFFFFF;       
       break;     
     case 6:
@@ -722,7 +720,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
               ((semaphore_t*)handle)->semaphore_count += ((release_object_t*) param)->release_count;
               ((release_object_t*) param)->result=E_OK;              
                 
-              if(  ((semaphore_t*)handle)->semaphore_count && wakeup_waiting_handle_task( (release_object_t*) param) )
+              while(  ((semaphore_t*)handle)->semaphore_count && wakeup_waiting_handle_task((handle_base_t*)((release_object_t*) param)->handle) )
               {
                   --((semaphore_t*)handle)->semaphore_count;
               }                
@@ -744,7 +742,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           {
             if( ((mutex_t*)handle)->owner ==current_task_id )
             {              
-                ((mutex_t*)handle)->owner= wakeup_waiting_handle_task( (release_object_t*) param);
+                ((mutex_t*)handle)->owner= wakeup_waiting_handle_task((handle_base_t*)((release_object_t*) param)->handle);
             }
             else
             {
@@ -774,13 +772,13 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
         }
         if(INVALID_TID!=task_id)
         {
-          TCB[task_id]=malloc(sizeof(TCB_t));
+          TCB[task_id]=(TCB_t*)malloc(sizeof(TCB_t));
           if(TCB[task_id])
           {
             TCB[task_id]->StartAddress = ((create_task_t*) param)->StartAddress;
             TCB[task_id]->Parameter = ((create_task_t*) param)->Parameter;
             TCB[task_id]->StackSize = ((create_task_t*) param)->StackSize;         
-            TCB[task_id]->Stack=malloc(((create_task_t*) param)->StackSize);
+            TCB[task_id]->Stack=(uint32_t*)malloc(((create_task_t*) param)->StackSize);
             if(TCB[task_id]->Stack)
             {
               InitStack(TCB[task_id]);
@@ -816,7 +814,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
       break;
       
       case 10:
-        mailbox=malloc(sizeof(mailbox_t));
+        mailbox=(mailbox_t*)malloc(sizeof(mailbox_t));
         if(mailbox)
         {         
           mailbox->mailbox_base.maxmsg= ((create_mailbox_t*)param)->maxmsg;
@@ -830,8 +828,9 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
             mailbox->read_slot.base.waiting_for_multiple_tasks=0;
             mailbox->read_slot.idx=0;
             mailbox->read_slot.owner=HANDLE_OWNERLESS;
-            mailbox->read_slot.packet=mailbox->mailbox_base.buffer;
+            mailbox->read_slot.packet=(mailbox_packet_t*)mailbox->mailbox_base.buffer;
             mailbox->read_slot.mailbox_base=&mailbox->mailbox_base;
+            mailbox->read_slot.opposite_slot=(struct mailbox_slot_t*)&mailbox->write_slot;
             *((create_mailbox_t*)param)->read_slot=(HANDLE)&mailbox->read_slot;
 
             mailbox->write_slot.base.type=HANDLE_TYPE_MAILBOX_WRITE;
@@ -839,8 +838,9 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
             mailbox->write_slot.base.waiting_for_multiple_tasks=0;
             mailbox->write_slot.idx=0;
             mailbox->read_slot.owner=HANDLE_OWNERLESS;            
-            mailbox->write_slot.packet=mailbox->mailbox_base.buffer;
+            mailbox->write_slot.packet=(mailbox_packet_t*)mailbox->mailbox_base.buffer;
             mailbox->write_slot.mailbox_base=&mailbox->mailbox_base;
+            mailbox->write_slot.opposite_slot=(struct mailbox_slot_t*)&mailbox->read_slot;            
             *((create_mailbox_t*)param)->write_slot=(HANDLE)&mailbox->write_slot;
 
             ((create_mailbox_t*)param)->result=E_OK;                        
@@ -855,24 +855,100 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           }
         }
       break;
-     
+ case 11:
+      //SendMessage 
+      if(  ((wait_for_object_t*)param)->handle  && (((wait_for_object_t*)param)->handle!=INVALID_HANDLE) && 
+          (((handle_base_t*)((wait_for_object_t*)param)->handle)->type==HANDLE_TYPE_MAILBOX_WRITE) )
+      {
+        handle=((wait_for_object_t*)param)->handle; 
+        slot=(mailbox_slot_t*)handle;        
+        if( ((wait_for_object_t*)param)->size<= slot->mailbox_base->msgsize)
+        {   
+          task_id=wakeup_waiting_handle_task(&slot->opposite_slot->base);
+          if(task_id)
+          {            
+            //same task is waiting this message 
+            if(HANDLE_TYPE_MAILBOX_READ==TCB[task_id]->RequestStruct->type)
+            {
+              if( TCB[task_id]->RequestStruct->size>= ((wait_for_object_t*)param)->size ) 
+              {                        
+                memcpy( TCB[task_id]->RequestStruct->buffer, ((wait_for_object_t*)param)->buffer,((wait_for_object_t*)param)->size);             
+                TCB[task_id]->RequestStruct->result=((wait_for_object_t*)param)->size;
+              }
+              else
+              {
+                //buffer too small
+                TCB[task_id]->RequestStruct->result=E_BUFFER_TOO_SMALL;              
+                task_id=0;
+              }            
+            }
+          } 
+          if(!task_id)
+          {
+            //No one task is waiting this message 
+            if( slot->mailbox_base->counter < slot->mailbox_base->maxmsg )
+            {
+              //There is a room for this message
+              slot->packet->size=((wait_for_object_t*)param)->size;
+              memcpy( slot->packet->data, ((wait_for_object_t*)param)->buffer, ((wait_for_object_t*)param)->size ); 
+              inc_mailbox_pointer(slot);                
+              ++slot->mailbox_base->counter;
+            }
+            else
+            {
+              //Mailbox is full. Send to sleep the task
+              result=set_sleep_waiting_handle_task((wait_for_object_t*) param, current_task_mask);                          
+            }            
+          }
+//          //All OK
+//          ((wait_for_object_t*)param)->result=E_OK;
+        }
+        else
+        {
+          //Too long message
+          ((wait_for_object_t*)param)->result=E_BUFFER_TOO_SMALL;          
+        }
+      }
+      else
+      {
+        //Invalid or not a MailBox handle
+        ((wait_for_object_t*)param)->result=E_INVALID_HANDLE;
+      }
+      break;      
+#if 0     
       case 11:
         //SetMessage and GetMessage
         if(  ((wait_for_object_t*)param)->handle  && (((wait_for_object_t*)param)->handle!=INVALID_HANDLE) ) 
         {     
-          handle=((wait_for_object_t*)param)->handle;        
+          handle=((wait_for_object_t*)param)->handle; 
+          slot=(mailbox_slot_t*)handle;
+          task_id=slot->opposite_slot->owner;            
+          if(HANDLE_OWNERLESS==task_id)
+          {
+            task_id= __CLZ(slot->opposite_slot->base.waiting_tasks) & 0x0000001F; 
+          }
           switch( ((handle_base_t*)handle)->type )
           {  
             case HANDLE_TYPE_MAILBOX_READ:
-              lock_handle=((mailbox_slot_t*)handle)->mailbox_base->counter && 
-                (((mailbox_slot_t*)handle)->owner == HANDLE_OWNERLESS) ||  (((mailbox_slot_t*)handle)->owner == current_task_id);
+              lock_handle=slot->mailbox_base->counter && 
+                ( (slot->owner == HANDLE_OWNERLESS) ||  (slot->owner == current_task_id) );
               
             break;
           
             case HANDLE_TYPE_MAILBOX_WRITE:
-              lock_handle=(((mailbox_slot_t*)handle)->mailbox_base->counter<((mailbox_slot_t*)handle)->mailbox_base->maxmsg) &&
-                (((mailbox_slot_t*)handle)->owner == HANDLE_OWNERLESS) ||  (((mailbox_slot_t*)handle)->owner == current_task_id);              
-                             
+              if((slot->mailbox_base->counter < slot->mailbox_base->maxmsg) &&
+                 ( (slot->owner == HANDLE_OWNERLESS) ||  (slot->owner == current_task_id) ))
+              {
+                if(task_id!=HANDLE_OWNERLESS)
+                {
+                  memcpy( TCB[task_id]->RequestStruct->buffer,
+                          ((wait_for_object_t*)param)->buffer,
+                          ((wait_for_object_t*)param)->size
+                      );             
+                  TCB[task_id]->RequestStruct->result=((wait_for_object_t*)param)->size;
+
+                }
+              }                             
             break;
             
             default: while(1); break;             
@@ -880,7 +956,20 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           
           if(lock_handle)
           {
-            
+            task_id=slot->opposite_slot->owner;            
+            if(HANDLE_OWNERLESS==task_id)
+            {
+              task_id= __CLZ(slot->opposite_slot->base.waiting_tasks) & 0x0000001F; 
+            }
+            if(task_id && task_id!=HANDLE_OWNERLESS)
+            {
+              
+            }            
+          }
+          else
+          {
+            //set task sleep
+            result=set_sleep_waiting_handle_task((wait_for_object_t*) param, current_task_mask);                         
           }
         }
         else
@@ -889,6 +978,7 @@ static uint32_t SVCHandler_main(uint32_t param, uint32_t svc_id)
           ((wait_for_object_t*) param)->result=E_INVALID_HANDLE;          
         }
       break;
+#endif      
 #if 0
       {
 
@@ -1070,12 +1160,22 @@ void SVC_Handler(void)
           "     mrs     r3,psp                  \n"            
           "     str     r0,[r3,#0]              \n"  
           "     bx      lr                      \n"             
-          "     dc16    0                       \n" 
-//          "  ALIGNROM 1     \n"           
-//          "     .align  2              \n"
+          "     nop                             \n"
+#ifdef __cplusplus            
+          "SVCHandler_main_local:               \n"
+          "     dc32    _Z15SVCHandler_mainjj   \n"    
+          "coreSheduler_local:                  \n"            
+          "     dc32    _Z12coreShedulerm       \n"              
+          "current_task_local:                  \n"
+          "     dc32    current_task            \n"
+          "coreAllocateMem_local:               \n"
+          "     dc32    _Z15coreAllocateMemj    \n" 
+          "ExtendRequest_local:                 \n"  
+          "     dc32    ExtendRequest           \n"                           
+#else            
           "SVCHandler_main_local:               \n"
           "     dc32    SVCHandler_main         \n"    
-          "coreSheduler_local:                  \n"
+          "coreSheduler_local:                  \n"            
           "     dc32    coreSheduler            \n"              
           "current_task_local:                  \n"
           "     dc32    current_task            \n"
@@ -1083,8 +1183,6 @@ void SVC_Handler(void)
           "     dc32    coreAllocateMem         \n" 
           "ExtendRequest_local:                 \n"  
           "     dc32    ExtendRequest           \n"               
+#endif            
        );   
 }
-
-
-
